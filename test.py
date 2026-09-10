@@ -1,18 +1,21 @@
+import os
 import random
 
 from arcengine import GameAction, GameState
 import arc_agi
 
-# Override specific parameters
-arc = arc_agi.Arcade(
-    arc_api_key="7b2f2846-152b-457f-86c1-01a442572897"
-)
+# API key is read from the ARC_API_KEY environment variable (see .env.example).
+# Never commit a real key: this repository is public.
+api_key = os.environ.get("ARC_API_KEY")
+if not api_key:
+    raise SystemExit("Set ARC_API_KEY in your environment (or a .env file) before running.")
+
+arc = arc_agi.Arcade(arc_api_key=api_key)
 
 
 # Create an environment with terminal rendering
 env = arc.make("ft09",
-               render_mode="human",
-               scorecard_id="1465f951-f75c-40cd-8f2d-d6456f91246d"
+               render_mode="human"
                )
 if env is None:
     print("Failed to create environment")
