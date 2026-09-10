@@ -1,0 +1,23 @@
+# Secrets
+.env
+.kaggle/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# ARC-AGI-3 local caches
+environment_files/
+recordings/
+vendor/
+
+# Kaggle build output
+submission.parquet
+notebooks/submission.ipynb
+
+# OS / editors
+.DS_Store
+.vscode/
+.idea/
