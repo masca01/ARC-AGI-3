@@ -21,3 +21,6 @@ notebooks/submission.ipynb
 .DS_Store
 .vscode/
 .idea/
+
+# Local run artefacts (plots, replay GIFs)
+outputs/

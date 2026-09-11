@@ -1,0 +1,6 @@
+arc-agi>=0.9.6
+arcengine
+numpy
+torch
+python-dotenv
+matplotlib
