@@ -1,0 +1,2 @@
+game_id,episode,won,final_state,levels_completed,actions,interactions,semantic_repeats,models
+ls20,1,False,GameState.GAME_OVER,3,236,11,86,"{'4b9e301c1d4f': 'rotate_cw', '24c7fe7b7d8e': 'resource', '581b2b8e6e51': 'recolor'}"

@@ -1,0 +1,2 @@
+game_id,episode,won,final_state,levels_completed,actions,planned_actions,fallback_actions,special_visits,unique_special_signatures,repeated_states
+ls20,1,False,GameState.GAME_OVER,1,171,171,0,15,4,0

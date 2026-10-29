@@ -1,0 +1,2872 @@
+{
+  "tiles": {
+    "d19b039c780e": {
+      "signature": "d19b039c780e",
+      "visits": 6,
+      "last_position": [
+        9,
+        9
+      ],
+      "belief": {
+        "rotate_or_transform": 0.9620915841344899,
+        "recolor": 0.037906804852885556,
+        "refill_resource": 3.222025249078664e-07,
+        "goal_or_exit": 3.222025249078664e-07,
+        "teleport_or_move": 3.222025249078664e-07,
+        "hazard": 3.222025249078664e-07,
+        "no_effect": 3.222025249078664e-07
+      },
+      "effects": [
+        {
+          "scene_changed_cells": 58,
+          "hud_changed_cells": 0,
+          "hud_changed": false,
+          "player_jump": false,
+          "level_advanced": false,
+          "terminal_loss": false,
+          "player_before": [
+            7,
+            3
+          ],
+          "player_after": [
+            6,
+            3
+          ]
+        },
+        {
+          "scene_changed_cells": 58,
+          "hud_changed_cells": 4,
+          "hud_changed": true,
+          "player_jump": false,
+          "level_advanced": false,
+          "terminal_loss": false,
+          "player_before": [
+            8,
+            9
+          ],
+          "player_after": [
+            9,
+            9
+          ]
+        },
+        {
+          "scene_changed_cells": 58,
+          "hud_changed_cells": 4,
+          "hud_changed": true,
+          "player_jump": false,
+          "level_advanced": false,
+          "terminal_loss": false,
+          "player_before": [
+            8,
+            9
+          ],
+          "player_after": [
+            9,
+            9
+          ]
+        },
+        {
+          "scene_changed_cells": 58,
+          "hud_changed_cells": 4,
+          "hud_changed": true,
+          "player_jump": false,
+          "level_advanced": false,
+          "terminal_loss": false,
+          "player_before": [
+            9,
+            8
+          ],
+          "player_after": [
+            9,
+            9
+          ]
+        },
+        {
+          "scene_changed_cells": 58,
+          "hud_changed_cells": 4,
+          "hud_changed": true,
+          "player_jump": false,
+          "level_advanced": false,
+          "terminal_loss": false,
+          "player_before": [
+            8,
+            9
+          ],
+          "player_after": [
+            9,
+            9
+          ]
+        },
+        {
+          "scene_changed_cells": 58,
+          "hud_changed_cells": 4,
+          "hud_changed": true,
+          "player_jump": false,
+          "level_advanced": false,
+          "terminal_loss": false,
+          "player_before": [
+            9,
+            8
+          ],
+          "player_after": [
+            9,
+            9
+          ]
+        }
+      ]
+    },
+    "00fae8b2f03c": {
+      "signature": "00fae8b2f03c",
+      "visits": 1,
+      "last_position": [
+        2,
+        6
+      ],
+      "belief": {
+        "rotate_or_transform": 0.04,
+        "recolor": 0.04,
+        "refill_resource": 0.04,
+        "goal_or_exit": 0.76,
+        "teleport_or_move": 0.04,
+        "hazard": 0.04,
+        "no_effect": 0.04
+      },
+      "effects": [
+        {
+          "scene_changed_cells": 1437,
+          "hud_changed_cells": 22,
+          "hud_changed": true,
+          "player_jump": true,
+          "level_advanced": true,
+          "terminal_loss": false,
+          "player_before": [
+            3,
+            6
+          ],
+          "player_after": [
+            8,
+            5
+          ]
+        }
+      ]
+    },
+    "2164d8663c55": {
+      "signature": "2164d8663c55",
+      "visits": 6,
+      "last_position": [
+        10,
+        7
+      ],
+      "belief": {
+        "rotate_or_transform": 0.9620915841344899,
+        "recolor": 0.037906804852885556,
+        "refill_resource": 3.222025249078664e-07,
+        "goal_or_exit": 3.222025249078664e-07,
+        "teleport_or_move": 3.222025249078664e-07,
+        "hazard": 3.222025249078664e-07,
+        "no_effect": 3.222025249078664e-07
+      },
+      "effects": [
+        {
+          "scene_changed_cells": 50,
+          "hud_changed_cells": 44,
+          "hud_changed": true,
+          "player_jump": false,
+          "level_advanced": false,
+          "terminal_loss": false,
+          "player_before": [
+            3,
+            3
+          ],
+          "player_after": [
+            3,
+            2
+          ]
+        },
+        {
+          "scene_changed_cells": 50,
+          "hud_changed_cells": 68,
+          "hud_changed": true,
+          "player_jump": false,
+          "level_advanced": false,
+          "terminal_loss": false,
+          "player_before": [
+            10,
+            8
+          ],
+          "player_after": [
+            10,
+            7
+          ]
+        },
+        {
+          "scene_changed_cells": 50,
+          "hud_changed_cells": 48,
+          "hud_changed": true,
+          "player_jump": false,
+          "level_advanced": false,
+          "terminal_loss": false,
+          "player_before": [
+            3,
+            3
+          ],
+          "player_after": [
+            3,
+            2
+          ]
+        },
+        {
+          "scene_changed_cells": 50,
+          "hud_changed_cells": 68,
+          "hud_changed": true,
+          "player_jump": false,
+          "level_advanced": false,
+          "terminal_loss": false,
+          "player_before": [
+            10,
+            8
+          ],
+          "player_after": [
+            10,
+            7
+          ]
+        },
+        {
+          "scene_changed_cells": 50,
+          "hud_changed_cells": 48,
+          "hud_changed": true,
+          "player_jump": false,
+          "level_advanced": false,
+          "terminal_loss": false,
+          "player_before": [
+            3,
+            3
+          ],
+          "player_after": [
+            3,
+            2
+          ]
+        },
+        {
+          "scene_changed_cells": 50,
+          "hud_changed_cells": 68,
+          "hud_changed": true,
+          "player_jump": false,
+          "level_advanced": false,
+          "terminal_loss": false,
+          "player_before": [
+            10,
+            8
+          ],
+          "player_after": [
+            10,
+            7
+          ]
+        }
+      ]
+    },
+    "712a181b3e73": {
+      "signature": "712a181b3e73",
+      "visits": 2,
+      "last_position": [
+        8,
+        2
+      ],
+      "belief": {
+        "rotate_or_transform": 0.00432900432900433,
+        "recolor": 0.00432900432900433,
+        "refill_resource": 0.9740259740259741,
+        "goal_or_exit": 0.00432900432900433,
+        "teleport_or_move": 0.00432900432900433,
+        "hazard": 0.00432900432900433,
+        "no_effect": 0.00432900432900433
+      },
+      "effects": [
+        {
+          "scene_changed_cells": 0,
+          "hud_changed_cells": 4,
+          "hud_changed": true,
+          "player_jump": false,
+          "level_advanced": false,
+          "terminal_loss": false,
+          "player_before": [
+            8,
+            5
+          ],
+          "player_after": [
+            8,
+            5
+          ]
+        },
+        {
+          "scene_changed_cells": 0,
+          "hud_changed_cells": 4,
+          "hud_changed": true,
+          "player_jump": false,
+          "level_advanced": false,
+          "terminal_loss": false,
+          "player_before": [
+            8,
+            5
+          ],
+          "player_after": [
+            8,
+            5
+          ]
+        }
+      ]
+    }
+  },
+  "transitions": [
+    {
+      "level_before": 0,
+      "level_after": 0,
+      "source": [
+        9,
+        6
+      ],
+      "target": [
+        9,
+        5
+      ],
+      "action": "ACTION3",
+      "changed_cells": 52,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 0,
+      "level_after": 0,
+      "source": [
+        9,
+        5
+      ],
+      "target": [
+        9,
+        4
+      ],
+      "action": "ACTION3",
+      "changed_cells": 52,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 0,
+      "level_after": 0,
+      "source": [
+        9,
+        4
+      ],
+      "target": [
+        9,
+        3
+      ],
+      "action": "ACTION3",
+      "changed_cells": 52,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 0,
+      "level_after": 0,
+      "source": [
+        9,
+        3
+      ],
+      "target": [
+        8,
+        3
+      ],
+      "action": "ACTION1",
+      "changed_cells": 52,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 0,
+      "level_after": 0,
+      "source": [
+        8,
+        3
+      ],
+      "target": [
+        7,
+        3
+      ],
+      "action": "ACTION1",
+      "changed_cells": 52,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 0,
+      "level_after": 0,
+      "source": [
+        7,
+        3
+      ],
+      "target": [
+        6,
+        3
+      ],
+      "action": "ACTION1",
+      "changed_cells": 58,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 0,
+      "level_after": 0,
+      "source": [
+        6,
+        3
+      ],
+      "target": [
+        5,
+        3
+      ],
+      "action": "ACTION1",
+      "changed_cells": 52,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 0,
+      "level_after": 0,
+      "source": [
+        5,
+        3
+      ],
+      "target": [
+        5,
+        4
+      ],
+      "action": "ACTION4",
+      "changed_cells": 52,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 0,
+      "level_after": 0,
+      "source": [
+        5,
+        4
+      ],
+      "target": [
+        5,
+        5
+      ],
+      "action": "ACTION4",
+      "changed_cells": 52,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 0,
+      "level_after": 0,
+      "source": [
+        5,
+        5
+      ],
+      "target": [
+        5,
+        6
+      ],
+      "action": "ACTION4",
+      "changed_cells": 52,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 0,
+      "level_after": 0,
+      "source": [
+        5,
+        6
+      ],
+      "target": [
+        4,
+        6
+      ],
+      "action": "ACTION1",
+      "changed_cells": 52,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 0,
+      "level_after": 0,
+      "source": [
+        4,
+        6
+      ],
+      "target": [
+        3,
+        6
+      ],
+      "action": "ACTION1",
+      "changed_cells": 52,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 0,
+      "level_after": 1,
+      "source": [
+        3,
+        6
+      ],
+      "target": [
+        8,
+        5
+      ],
+      "action": "ACTION1",
+      "changed_cells": 1459,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        8,
+        5
+      ],
+      "target": [
+        7,
+        5
+      ],
+      "action": "ACTION1",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        7,
+        5
+      ],
+      "target": [
+        7,
+        6
+      ],
+      "action": "ACTION4",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        7,
+        6
+      ],
+      "target": [
+        6,
+        6
+      ],
+      "action": "ACTION1",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        6,
+        6
+      ],
+      "target": [
+        5,
+        6
+      ],
+      "action": "ACTION1",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        5,
+        6
+      ],
+      "target": [
+        4,
+        6
+      ],
+      "action": "ACTION1",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        4,
+        6
+      ],
+      "target": [
+        3,
+        6
+      ],
+      "action": "ACTION1",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        3,
+        6
+      ],
+      "target": [
+        2,
+        6
+      ],
+      "action": "ACTION1",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        2,
+        6
+      ],
+      "target": [
+        2,
+        5
+      ],
+      "action": "ACTION3",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        2,
+        5
+      ],
+      "target": [
+        2,
+        4
+      ],
+      "action": "ACTION3",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        2,
+        4
+      ],
+      "target": [
+        2,
+        3
+      ],
+      "action": "ACTION3",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        2,
+        3
+      ],
+      "target": [
+        3,
+        3
+      ],
+      "action": "ACTION2",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        3,
+        3
+      ],
+      "target": [
+        3,
+        2
+      ],
+      "action": "ACTION3",
+      "changed_cells": 94,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        3,
+        2
+      ],
+      "target": [
+        2,
+        2
+      ],
+      "action": "ACTION1",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        2,
+        2
+      ],
+      "target": [
+        2,
+        3
+      ],
+      "action": "ACTION4",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        2,
+        3
+      ],
+      "target": [
+        2,
+        4
+      ],
+      "action": "ACTION4",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        2,
+        4
+      ],
+      "target": [
+        2,
+        5
+      ],
+      "action": "ACTION4",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        2,
+        5
+      ],
+      "target": [
+        2,
+        6
+      ],
+      "action": "ACTION4",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        2,
+        6
+      ],
+      "target": [
+        2,
+        7
+      ],
+      "action": "ACTION4",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        2,
+        7
+      ],
+      "target": [
+        2,
+        8
+      ],
+      "action": "ACTION4",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        2,
+        8
+      ],
+      "target": [
+        3,
+        8
+      ],
+      "action": "ACTION2",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        3,
+        8
+      ],
+      "target": [
+        3,
+        9
+      ],
+      "action": "ACTION4",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        3,
+        9
+      ],
+      "target": [
+        4,
+        9
+      ],
+      "action": "ACTION2",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        4,
+        9
+      ],
+      "target": [
+        5,
+        9
+      ],
+      "action": "ACTION2",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        5,
+        9
+      ],
+      "target": [
+        6,
+        9
+      ],
+      "action": "ACTION2",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        6,
+        9
+      ],
+      "target": [
+        7,
+        9
+      ],
+      "action": "ACTION2",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        7,
+        9
+      ],
+      "target": [
+        8,
+        9
+      ],
+      "action": "ACTION2",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        8,
+        9
+      ],
+      "target": [
+        9,
+        9
+      ],
+      "action": "ACTION2",
+      "changed_cells": 62,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        9,
+        9
+      ],
+      "target": [
+        10,
+        9
+      ],
+      "action": "ACTION2",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        10,
+        9
+      ],
+      "target": [
+        10,
+        8
+      ],
+      "action": "ACTION3",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        10,
+        8
+      ],
+      "target": [
+        10,
+        7
+      ],
+      "action": "ACTION3",
+      "changed_cells": 118,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        10,
+        7
+      ],
+      "target": [
+        10,
+        8
+      ],
+      "action": "ACTION4",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        10,
+        8
+      ],
+      "target": [
+        9,
+        8
+      ],
+      "action": "ACTION1",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        9,
+        8
+      ],
+      "target": [
+        8,
+        8
+      ],
+      "action": "ACTION1",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        8,
+        8
+      ],
+      "target": [
+        8,
+        9
+      ],
+      "action": "ACTION4",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        8,
+        9
+      ],
+      "target": [
+        7,
+        9
+      ],
+      "action": "ACTION1",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        7,
+        9
+      ],
+      "target": [
+        6,
+        9
+      ],
+      "action": "ACTION1",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        6,
+        9
+      ],
+      "target": [
+        5,
+        9
+      ],
+      "action": "ACTION1",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        5,
+        9
+      ],
+      "target": [
+        4,
+        9
+      ],
+      "action": "ACTION1",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        4,
+        9
+      ],
+      "target": [
+        3,
+        9
+      ],
+      "action": "ACTION1",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        3,
+        9
+      ],
+      "target": [
+        2,
+        9
+      ],
+      "action": "ACTION1",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        2,
+        9
+      ],
+      "target": [
+        2,
+        8
+      ],
+      "action": "ACTION3",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        2,
+        8
+      ],
+      "target": [
+        2,
+        7
+      ],
+      "action": "ACTION3",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        2,
+        7
+      ],
+      "target": [
+        2,
+        6
+      ],
+      "action": "ACTION3",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        2,
+        6
+      ],
+      "target": [
+        2,
+        5
+      ],
+      "action": "ACTION3",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        2,
+        5
+      ],
+      "target": [
+        2,
+        4
+      ],
+      "action": "ACTION3",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        2,
+        4
+      ],
+      "target": [
+        2,
+        3
+      ],
+      "action": "ACTION3",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        2,
+        3
+      ],
+      "target": [
+        3,
+        3
+      ],
+      "action": "ACTION2",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        3,
+        3
+      ],
+      "target": [
+        4,
+        3
+      ],
+      "action": "ACTION2",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        4,
+        3
+      ],
+      "target": [
+        4,
+        2
+      ],
+      "action": "ACTION3",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        4,
+        2
+      ],
+      "target": [
+        5,
+        2
+      ],
+      "action": "ACTION2",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        5,
+        2
+      ],
+      "target": [
+        6,
+        2
+      ],
+      "action": "ACTION2",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        6,
+        2
+      ],
+      "target": [
+        8,
+        5
+      ],
+      "action": "ACTION2",
+      "changed_cells": 162,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        8,
+        5
+      ],
+      "target": [
+        8,
+        5
+      ],
+      "action": "ACTION2",
+      "changed_cells": 4,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        8,
+        5
+      ],
+      "target": [
+        7,
+        5
+      ],
+      "action": "ACTION1",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        7,
+        5
+      ],
+      "target": [
+        7,
+        6
+      ],
+      "action": "ACTION4",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        7,
+        6
+      ],
+      "target": [
+        6,
+        6
+      ],
+      "action": "ACTION1",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        6,
+        6
+      ],
+      "target": [
+        5,
+        6
+      ],
+      "action": "ACTION1",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        5,
+        6
+      ],
+      "target": [
+        4,
+        6
+      ],
+      "action": "ACTION1",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        4,
+        6
+      ],
+      "target": [
+        3,
+        6
+      ],
+      "action": "ACTION1",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        3,
+        6
+      ],
+      "target": [
+        2,
+        6
+      ],
+      "action": "ACTION1",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        2,
+        6
+      ],
+      "target": [
+        2,
+        5
+      ],
+      "action": "ACTION3",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        2,
+        5
+      ],
+      "target": [
+        2,
+        4
+      ],
+      "action": "ACTION3",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        2,
+        4
+      ],
+      "target": [
+        2,
+        3
+      ],
+      "action": "ACTION3",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        2,
+        3
+      ],
+      "target": [
+        3,
+        3
+      ],
+      "action": "ACTION2",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        3,
+        3
+      ],
+      "target": [
+        3,
+        2
+      ],
+      "action": "ACTION3",
+      "changed_cells": 98,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        3,
+        2
+      ],
+      "target": [
+        2,
+        2
+      ],
+      "action": "ACTION1",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        2,
+        2
+      ],
+      "target": [
+        2,
+        3
+      ],
+      "action": "ACTION4",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        2,
+        3
+      ],
+      "target": [
+        2,
+        4
+      ],
+      "action": "ACTION4",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        2,
+        4
+      ],
+      "target": [
+        2,
+        5
+      ],
+      "action": "ACTION4",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        2,
+        5
+      ],
+      "target": [
+        2,
+        6
+      ],
+      "action": "ACTION4",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        2,
+        6
+      ],
+      "target": [
+        2,
+        7
+      ],
+      "action": "ACTION4",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        2,
+        7
+      ],
+      "target": [
+        2,
+        8
+      ],
+      "action": "ACTION4",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        2,
+        8
+      ],
+      "target": [
+        3,
+        8
+      ],
+      "action": "ACTION2",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        3,
+        8
+      ],
+      "target": [
+        3,
+        9
+      ],
+      "action": "ACTION4",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        3,
+        9
+      ],
+      "target": [
+        4,
+        9
+      ],
+      "action": "ACTION2",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        4,
+        9
+      ],
+      "target": [
+        5,
+        9
+      ],
+      "action": "ACTION2",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        5,
+        9
+      ],
+      "target": [
+        6,
+        9
+      ],
+      "action": "ACTION2",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        6,
+        9
+      ],
+      "target": [
+        7,
+        9
+      ],
+      "action": "ACTION2",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        7,
+        9
+      ],
+      "target": [
+        8,
+        9
+      ],
+      "action": "ACTION2",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        8,
+        9
+      ],
+      "target": [
+        9,
+        9
+      ],
+      "action": "ACTION2",
+      "changed_cells": 62,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        9,
+        9
+      ],
+      "target": [
+        10,
+        9
+      ],
+      "action": "ACTION2",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        10,
+        9
+      ],
+      "target": [
+        10,
+        8
+      ],
+      "action": "ACTION3",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        10,
+        8
+      ],
+      "target": [
+        10,
+        7
+      ],
+      "action": "ACTION3",
+      "changed_cells": 118,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        10,
+        7
+      ],
+      "target": [
+        10,
+        8
+      ],
+      "action": "ACTION4",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        10,
+        8
+      ],
+      "target": [
+        9,
+        8
+      ],
+      "action": "ACTION1",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        9,
+        8
+      ],
+      "target": [
+        9,
+        9
+      ],
+      "action": "ACTION4",
+      "changed_cells": 62,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        9,
+        9
+      ],
+      "target": [
+        8,
+        9
+      ],
+      "action": "ACTION1",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        8,
+        9
+      ],
+      "target": [
+        7,
+        9
+      ],
+      "action": "ACTION1",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        7,
+        9
+      ],
+      "target": [
+        6,
+        9
+      ],
+      "action": "ACTION1",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        6,
+        9
+      ],
+      "target": [
+        5,
+        9
+      ],
+      "action": "ACTION1",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        5,
+        9
+      ],
+      "target": [
+        4,
+        9
+      ],
+      "action": "ACTION1",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        4,
+        9
+      ],
+      "target": [
+        3,
+        9
+      ],
+      "action": "ACTION1",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        3,
+        9
+      ],
+      "target": [
+        2,
+        9
+      ],
+      "action": "ACTION1",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        2,
+        9
+      ],
+      "target": [
+        2,
+        8
+      ],
+      "action": "ACTION3",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        2,
+        8
+      ],
+      "target": [
+        2,
+        7
+      ],
+      "action": "ACTION3",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        2,
+        7
+      ],
+      "target": [
+        2,
+        6
+      ],
+      "action": "ACTION3",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        2,
+        6
+      ],
+      "target": [
+        2,
+        5
+      ],
+      "action": "ACTION3",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        2,
+        5
+      ],
+      "target": [
+        2,
+        4
+      ],
+      "action": "ACTION3",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        2,
+        4
+      ],
+      "target": [
+        2,
+        3
+      ],
+      "action": "ACTION3",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        2,
+        3
+      ],
+      "target": [
+        3,
+        3
+      ],
+      "action": "ACTION2",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        3,
+        3
+      ],
+      "target": [
+        4,
+        3
+      ],
+      "action": "ACTION2",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        4,
+        3
+      ],
+      "target": [
+        4,
+        2
+      ],
+      "action": "ACTION3",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        4,
+        2
+      ],
+      "target": [
+        5,
+        2
+      ],
+      "action": "ACTION2",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        5,
+        2
+      ],
+      "target": [
+        6,
+        2
+      ],
+      "action": "ACTION2",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        6,
+        2
+      ],
+      "target": [
+        8,
+        5
+      ],
+      "action": "ACTION2",
+      "changed_cells": 170,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        8,
+        5
+      ],
+      "target": [
+        8,
+        5
+      ],
+      "action": "ACTION2",
+      "changed_cells": 4,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        8,
+        5
+      ],
+      "target": [
+        7,
+        5
+      ],
+      "action": "ACTION1",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        7,
+        5
+      ],
+      "target": [
+        7,
+        6
+      ],
+      "action": "ACTION4",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        7,
+        6
+      ],
+      "target": [
+        6,
+        6
+      ],
+      "action": "ACTION1",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        6,
+        6
+      ],
+      "target": [
+        5,
+        6
+      ],
+      "action": "ACTION1",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        5,
+        6
+      ],
+      "target": [
+        4,
+        6
+      ],
+      "action": "ACTION1",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        4,
+        6
+      ],
+      "target": [
+        3,
+        6
+      ],
+      "action": "ACTION1",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        3,
+        6
+      ],
+      "target": [
+        2,
+        6
+      ],
+      "action": "ACTION1",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        2,
+        6
+      ],
+      "target": [
+        2,
+        5
+      ],
+      "action": "ACTION3",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        2,
+        5
+      ],
+      "target": [
+        2,
+        4
+      ],
+      "action": "ACTION3",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        2,
+        4
+      ],
+      "target": [
+        2,
+        3
+      ],
+      "action": "ACTION3",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        2,
+        3
+      ],
+      "target": [
+        3,
+        3
+      ],
+      "action": "ACTION2",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        3,
+        3
+      ],
+      "target": [
+        3,
+        2
+      ],
+      "action": "ACTION3",
+      "changed_cells": 98,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        3,
+        2
+      ],
+      "target": [
+        2,
+        2
+      ],
+      "action": "ACTION1",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        2,
+        2
+      ],
+      "target": [
+        2,
+        3
+      ],
+      "action": "ACTION4",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        2,
+        3
+      ],
+      "target": [
+        2,
+        4
+      ],
+      "action": "ACTION4",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        2,
+        4
+      ],
+      "target": [
+        2,
+        5
+      ],
+      "action": "ACTION4",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        2,
+        5
+      ],
+      "target": [
+        2,
+        6
+      ],
+      "action": "ACTION4",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        2,
+        6
+      ],
+      "target": [
+        2,
+        7
+      ],
+      "action": "ACTION4",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        2,
+        7
+      ],
+      "target": [
+        2,
+        8
+      ],
+      "action": "ACTION4",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        2,
+        8
+      ],
+      "target": [
+        3,
+        8
+      ],
+      "action": "ACTION2",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        3,
+        8
+      ],
+      "target": [
+        3,
+        9
+      ],
+      "action": "ACTION4",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        3,
+        9
+      ],
+      "target": [
+        4,
+        9
+      ],
+      "action": "ACTION2",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        4,
+        9
+      ],
+      "target": [
+        5,
+        9
+      ],
+      "action": "ACTION2",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        5,
+        9
+      ],
+      "target": [
+        6,
+        9
+      ],
+      "action": "ACTION2",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        6,
+        9
+      ],
+      "target": [
+        7,
+        9
+      ],
+      "action": "ACTION2",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        7,
+        9
+      ],
+      "target": [
+        8,
+        9
+      ],
+      "action": "ACTION2",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        8,
+        9
+      ],
+      "target": [
+        9,
+        9
+      ],
+      "action": "ACTION2",
+      "changed_cells": 62,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        9,
+        9
+      ],
+      "target": [
+        10,
+        9
+      ],
+      "action": "ACTION2",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        10,
+        9
+      ],
+      "target": [
+        10,
+        8
+      ],
+      "action": "ACTION3",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        10,
+        8
+      ],
+      "target": [
+        10,
+        7
+      ],
+      "action": "ACTION3",
+      "changed_cells": 118,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        10,
+        7
+      ],
+      "target": [
+        10,
+        8
+      ],
+      "action": "ACTION4",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        10,
+        8
+      ],
+      "target": [
+        9,
+        8
+      ],
+      "action": "ACTION1",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        9,
+        8
+      ],
+      "target": [
+        9,
+        9
+      ],
+      "action": "ACTION4",
+      "changed_cells": 62,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        9,
+        9
+      ],
+      "target": [
+        8,
+        9
+      ],
+      "action": "ACTION1",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        8,
+        9
+      ],
+      "target": [
+        7,
+        9
+      ],
+      "action": "ACTION1",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        7,
+        9
+      ],
+      "target": [
+        6,
+        9
+      ],
+      "action": "ACTION1",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        6,
+        9
+      ],
+      "target": [
+        5,
+        9
+      ],
+      "action": "ACTION1",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        5,
+        9
+      ],
+      "target": [
+        4,
+        9
+      ],
+      "action": "ACTION1",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        4,
+        9
+      ],
+      "target": [
+        3,
+        9
+      ],
+      "action": "ACTION1",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        3,
+        9
+      ],
+      "target": [
+        2,
+        9
+      ],
+      "action": "ACTION1",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        2,
+        9
+      ],
+      "target": [
+        2,
+        8
+      ],
+      "action": "ACTION3",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        2,
+        8
+      ],
+      "target": [
+        2,
+        7
+      ],
+      "action": "ACTION3",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        2,
+        7
+      ],
+      "target": [
+        2,
+        6
+      ],
+      "action": "ACTION3",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        2,
+        6
+      ],
+      "target": [
+        2,
+        5
+      ],
+      "action": "ACTION3",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        2,
+        5
+      ],
+      "target": [
+        2,
+        4
+      ],
+      "action": "ACTION3",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        2,
+        4
+      ],
+      "target": [
+        2,
+        3
+      ],
+      "action": "ACTION3",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        2,
+        3
+      ],
+      "target": [
+        3,
+        3
+      ],
+      "action": "ACTION2",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        3,
+        3
+      ],
+      "target": [
+        4,
+        3
+      ],
+      "action": "ACTION2",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        4,
+        3
+      ],
+      "target": [
+        4,
+        2
+      ],
+      "action": "ACTION3",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        4,
+        2
+      ],
+      "target": [
+        5,
+        2
+      ],
+      "action": "ACTION2",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    },
+    {
+      "level_before": 1,
+      "level_after": 1,
+      "source": [
+        5,
+        2
+      ],
+      "target": [
+        6,
+        2
+      ],
+      "action": "ACTION2",
+      "changed_cells": 54,
+      "terminal_state": "GameState.NOT_FINISHED"
+    }
+  ]
+}
