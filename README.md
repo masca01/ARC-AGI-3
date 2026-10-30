@@ -14,6 +14,7 @@ ARC-AGI-3/
 │   ├── slide_net.py     CNN that learns from one or two surprises which icons push the player, and where
 │   ├── objectives.py    game-agnostic tracker of which goals are still open (levels with several doors)
 │   ├── memory.py        game-agnostic object memory: objectives, tiles, refills (used ones too) per level
+│   ├── gauge.py         discovers a resource bar from how it drains, with no place or colour given
 │   ├── base.py          minimal Agent base class, so the agent runs without the official framework
 │   └── __init__.py      marks agent/ as a Python package
 ├── tests/               regression tests (python3 tests/test_ls20_regression.py)
@@ -217,6 +218,34 @@ Returns to the cell just left: level 4 from 41 to 7, level 7 from 49 to 24. The 
 deliberate (stepping off a tile and back on to use it again). Level 7 is now below the human baseline
 (186).
 
+### Discovering the energy bar: GaugeFinder (`agent/gauge.py`, `GAUGE = True`)
+
+The ls20 parser reads the energy at a fixed place and colour (rows 61-62, columns 13-54, colour 11) and the
+lives next to it. That is true for ls20 only. GaugeFinder discovers the bar from how it behaves, with no
+place, colour or size given:
+
+- **Drain:** on almost every action one straight slice changes from a colour to another, the slice touches the
+  previous one, and together they stay a solid rectangle growing along one axis.
+- **Shrink:** the amount of that colour on screen goes down. This rules out moving objects, which keep their
+  colour: what they lose behind them they gain in front.
+- **Reading:** after 3 such slices the rest of the bar is found by walking along the axis while the screen shows
+  the fill colour. The value is how many slices still show it. The capacity comes from the bar's length.
+- **Meaning:** a restart with the gauge at 0 teaches "an empty gauge costs a life". Until then a draining gauge is
+  assumed to be a budget, so the planner respects it before the first death. This assumption is built in.
+
+It uses no neural network: the rule is exact, reads 2 rows of pixels and made no mistake on ls20, so a CNN
+would only have to learn the same thing with some error. With a gauge, restarts are recognised from the gauge
+refilling while the player is put back, so the lives are no longer read at all.
+
+| Check | Result |
+|---|---|
+| ls20: bar found | after 3 moves, the same box as the fixed reader, capacity 42 |
+| ls20: readings against the fixed reader | 440 of 440 correct |
+| ls20: full game with no fixed HUD reading | WIN, 443 actions, same per-level counts as before |
+| 6 held-out games, 400 random actions | a draining bar found on all 6; on 5 it was also seen refilling at a game over (ft09 had no game over) |
+
+Still fixed for ls20: the parser's key box, doors, tiles and colours. Run it with `--agent causal-gauge`.
+
 ### Other games: held-out test and fallback
 
 With no changes, the ls20 agent solved 0 levels on the other 6 games. ft09, r11l, sb26 and su15 have no
@@ -363,6 +392,10 @@ Comparison on the same 6 games and budget (one run each, so a difference of one 
 - The causal agent only works on `ls20`: everything except the player detector still assumes ls20's colours, 5 px grid and HUD layout, and it never clicks.
 
 ## Changelog
+
+### 2026-10-30 - GaugeFinder: the energy bar is discovered, not hard-coded
+- New `agent/gauge.py` and `run_local.py --agent causal-gauge`. Finds a resource bar from how it drains, reads it,
+  and learns from a restart that an empty gauge costs a life. ls20 result unchanged: WIN in 443 actions.
 
 ### 2026-10-29 - fallback to the general explorer on non-ls20 games
 - `CausalAgent` hands over to `MyAgent` (CNN explorer) when the game has no arrow keys, the ls20 parser keeps failing, or no controllable object is found. Fixes the crash on click games. The replay shows a "switched to general explorer" event.

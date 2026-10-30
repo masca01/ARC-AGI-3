@@ -9,6 +9,9 @@ with optional neural perception.
   SLIDES = True              SlideNet (slide_net.py) learns from one or two surprises which icons push the
                              player, in which direction and how far, and the planner uses that everywhere.
 
+  GAUGE = True               GaugeFinder (gauge.py) discovers the energy bar from how it drains, instead of
+                             reading it at the fixed place and colour of ls20.
+
 Everything else (keys, doors, tiles, gates, HUD reading, planning) is the teammate's code in
 ls20_specialist.py. After a GAME_OVER the agent RESETs and retries the same level, keeping what it
 learned about it.
@@ -35,6 +38,7 @@ except ImportError:  # local development in this repo
     from .base import Agent
 
 from .control_net import MOVE_IDS, ControlPerception
+from .gauge import GaugeFinder
 from .ls20_specialist import LS20ExtendedStateAgent
 from .slide_net import NAMES as SLIDE_NAMES
 from .slide_net import SlideLearner
@@ -51,6 +55,7 @@ class CausalAgent(Agent):
     PERCEPTION = "heuristic"     # or "neural"
     ORACLE = False               # neural only: also run the hand-made detector, for accuracy stats
     SLIDES = False               # learn pushes with SlideNet
+    GAUGE = False                # discover the energy bar instead of reading it at a fixed place
     OBJECTIVES = True            # track which goals are still open (several doors per level)
     MEMORY = True                # remember objectives, tiles and refills (including used ones)
     COMMIT = True                # keep executing a plan while it turns out as predicted
@@ -71,6 +76,9 @@ class CausalAgent(Agent):
         self.slide_events: list = []             # filled by the slide hook during this step
         if self.slides is not None:
             self.planner.slide_model = self._slide_hook
+        self.gauge = GaugeFinder() if self.GAUGE else None
+        self.planner.gauge = self.gauge
+        self.gauge_hits: list[int] = []          # 1 if the learned gauge read what the fixed reader reads
         self.prev: tuple[np.ndarray, int] | None = None   # (frame, action id) waiting for its outcome
         self.warmup_moves = 0
         self.attempts = 1
@@ -117,6 +125,11 @@ class CausalAgent(Agent):
             motion = self.perception.observe(self.prev[0], self.prev[1], frame)
         oracle = self._score_cnn(frame, level) if self.perception is not None and self.ORACLE else None
         events = []
+        if self.gauge is not None:
+            if self.prev is not None:
+                events += self.gauge.observe(self.prev[0], frame)
+            if self.ORACLE and self.gauge.gauge is not None:     # diagnostics only, like _score_cnn
+                self.gauge_hits.append(int(self.gauge.read(frame) == self.planner.resource(frame)))
         if self.trace and level > self.trace[-1]["level"]:
             events.append(("level", f"level {level} solved in {self.level_actions[level - 1]} actions"))
         if self.perception is not None and self.perception.trusted and not was_trusted:
@@ -161,6 +174,8 @@ class CausalAgent(Agent):
                 events.append(("edge", f"non-local move {edge.source} -> {edge.destination} "
                                        f"({len(self.planner.dynamic_edges)} known this level)"))
         events += self.slide_events
+        events += self.planner.gauge_events
+        self.planner.gauge_events = []
         if planned:
             events += [("goal", text) for _, text in self.planner.objective_events]
             events += [("memory", text) for _, text in self.planner.memory_events]
@@ -307,6 +322,15 @@ class CausalAgent(Agent):
         self.oracle_hits[level].append(int(guess == truth))
         return truth, guess
 
+    def _gauge_stats(self) -> dict[str, Any] | None:
+        found = self.gauge.gauge if self.gauge is not None else None
+        if found is None:
+            return None
+        return {"found at step": found.found_at, "colour": found.fill, "box": found.rect,
+                "capacity": found.capacity, "read at restarts": found.restarts,
+                "empty is fatal": self.gauge.fatal_when_empty,
+                "reads checked": len(self.gauge_hits), "reads correct": sum(self.gauge_hits)}
+
     def stats(self) -> dict[str, Any]:
         p = self.perception
         hits = [h for level in self.oracle_hits for h in level]
@@ -323,5 +347,6 @@ class CausalAgent(Agent):
             "models": {k: v.role for k, v in self.planner.models.items()},
             "slides": self.slides.stats() if self.slides is not None else None,
             "plan reuses": self.planner.plan_reuses,
+            "gauge": self._gauge_stats(),
             "fallback": self.fallback,
         }

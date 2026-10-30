@@ -42,6 +42,8 @@ AGENTS = {
     "causal": type("CausalHeuristic", (CausalAgent,), {"PERCEPTION": "heuristic"}),
     "causal-neural": type("CausalNeural", (CausalAgent,), {"PERCEPTION": "neural", "ORACLE": True}),
     "causal-slides": type("CausalSlides", (CausalAgent,), {"PERCEPTION": "neural", "ORACLE": True, "SLIDES": True}),
+    "causal-gauge": type("CausalGauge", (CausalAgent,), {"PERCEPTION": "neural", "ORACLE": True, "SLIDES": True,
+                                                         "GAUGE": True}),
 }
 
 

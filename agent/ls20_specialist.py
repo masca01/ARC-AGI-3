@@ -28,7 +28,10 @@ Ported unchanged except for:
   - `commit_plans`: keep executing the chosen plan while every step turns out as predicted, instead of
     searching again from scratch each step. Replanning every step with a model that changes a little
     each step (moving-tile phases, slide predictions from the current frame) and a capped search made
-    consecutive plans point in opposite directions, so the agent stepped back and forth.
+    consecutive plans point in opposite directions, so the agent stepped back and forth,
+  - `gauge` (GaugeFinder in gauge.py) replaces the fixed reading of the energy bar and the lives. The bar's
+    place, colour and capacity are discovered from how it behaves, and restarts are recognised from the
+    gauge refilling while the player is put back. None keeps the original reading.
 """
 from __future__ import annotations
 
@@ -269,6 +272,8 @@ class LS20ExtendedStateAgent:
         self.models: Dict[str, TileModel] = {}
         # frame -> (grid position, grid origin) or None; None means "use detect_player"
         self.locate_player: Optional[Callable[[np.ndarray], Optional[Tuple[Pos, Pos]]]] = None
+        self.gauge = None                             # GaugeFinder; None reads the ls20 HUD at fixed places
+        self.gauge_events: List[Tuple[str, str]] = []
         # (previous scene, previous action, scene) -> {cell: (class, probability, slide end)}; None = off
         self.slide_model: Optional[Callable] = None
         self.track_objectives = False
@@ -407,6 +412,16 @@ class LS20ExtendedStateAgent:
     def lives(frame: np.ndarray) -> int:
         return int(np.sum(frame[61:63, 56:64] == 8) // 4)
 
+    UNKNOWN_RESOURCE = 10 ** 6     # no gauge found yet: plan as if there were no limit
+
+    def read_hud(self, frame: np.ndarray) -> Tuple[int, int]:
+        """(resource, lives). With a learned gauge lives stay 0: restarts are detected without them."""
+        if self.gauge is None:
+            return self.resource(frame), self.lives(frame)
+        value = self.gauge.read(frame)
+        self.resource_capacity = self.UNKNOWN_RESOURCE if value is None else self.gauge.capacity
+        return (self.UNKNOWN_RESOURCE if value is None else value), 0
+
     @classmethod
     def detect_gates(cls, frame: np.ndarray, origin: Pos) -> List[Gate]:
         """Detect isolated one-cell-thick line objects on grid boundaries.
@@ -510,7 +525,7 @@ class LS20ExtendedStateAgent:
         visible_cells.add(player)
         return Scene(
             frames, frame, level, player, origin, free, tiles, doors, key,
-            self.resource(frame), self.lives(frame), gates,
+            *self.read_hud(frame), gates,
             self.dynamic_configuration(frame, gates), unseen, visible_cells, grid_cells,
         )
 
@@ -574,7 +589,8 @@ class LS20ExtendedStateAgent:
         self.level_tick = -1
         self.level_signature_visits = Counter()
         self.step_cost = 1
-        self.resource_capacity = max(42, scene.resource)
+        if self.gauge is None:
+            self.resource_capacity = max(42, scene.resource)
         if self.verbose:
             print(f"\n--- entered level {scene.level + 1}: key={scene.key}, goals={[d.goal for d in scene.doors]} ---")
 
@@ -780,6 +796,8 @@ class LS20ExtendedStateAgent:
         )
         if reset:
             self.pending_restart = False
+            if self.gauge is not None:
+                self.gauge_events = self.gauge.observe_restart(previous.resource)
             self.consumed.clear()
             if self.use_memory:
                 self.memory.restart(self.level_tick)
@@ -793,7 +811,7 @@ class LS20ExtendedStateAgent:
                 print("  life reset detected; reset dynamic phase, retained causal mechanics")
             return
         delta_resource = previous.resource - scene.resource
-        if delta_resource > 0:
+        if delta_resource > 0 and previous.resource != self.UNKNOWN_RESOURCE:
             self.step_cost = max(self.step_cost, delta_resource)
         attempted = self.attempted_destination(previous.player, self.last_action)
         self.learn_dynamic_transition(previous, scene, self.last_action)

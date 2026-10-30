@@ -121,6 +121,66 @@ def test_full_game_won_with_limited_vision_level_7():
     assert sum(agent.level_actions[:7]) <= 480, agent.level_actions
 
 
+def test_learned_gauge_wins_the_game_with_no_fixed_hud_reading():
+    """The energy bar is discovered, not read at a fixed place: same win, every reading correct."""
+    import arc_agi
+    from dotenv import load_dotenv
+
+    load_dotenv(ROOT / ".env")
+    logging.disable(logging.CRITICAL)
+    env = arc_agi.Arcade().make("ls20", include_frame_data=True)
+    agent_cls = type("TestAgent", (CausalAgent,), {"PERCEPTION": "neural", "SLIDES": True, "ORACLE": True,
+                                                  "GAUGE": True, "MAX_ACTIONS": 700})
+    agent = agent_cls(card_id="local", game_id="ls20", agent_name="test", ROOT_URL="http://localhost",
+                      record=False, arc_env=env)
+    agent.main()
+    gauge = agent.stats()["gauge"]
+    assert agent.frames[-1].state.name == "WIN", agent.level_actions
+    assert sum(agent.level_actions[:7]) <= 480, agent.level_actions
+    assert gauge["box"] == (61, 13, 62, 54) and gauge["capacity"] == 42, gauge
+    assert gauge["reads correct"] == gauge["reads checked"] > 400, gauge
+
+
+def test_gauge_finder_needs_no_place_or_colour():
+    """A vertical bar at another place and colour is found; a moving object is not a gauge."""
+    from agent.gauge import GaugeFinder
+
+    frame = np.full((64, 64), 3, dtype=np.int8)
+    frame[10:40, 2:4] = 7                                   # a vertical bar, draining from the top
+    finder = GaugeFinder()
+    for i in range(5):
+        after = frame.copy()
+        after[10 + i, 2:4] = 3
+        finder.observe(frame, after)
+        frame = after
+    assert finder.gauge is not None and finder.gauge.rect == (10, 2, 39, 3), finder.gauge
+    assert finder.capacity == 30 and finder.read(frame) == 25
+
+    frame = np.full((64, 64), 3, dtype=np.int8)
+    frame[30:32, 10:20] = 7                                 # a block sliding along: its colour never shrinks
+    finder = GaugeFinder()
+    for i in range(8):
+        after = np.roll(frame, 1, axis=1)
+        finder.observe(frame, after)
+        frame = after
+    assert finder.gauge is None
+
+
+def test_gauge_learns_what_empty_means_from_a_restart():
+    from agent.gauge import GaugeFinder
+
+    frame = np.full((64, 64), 3, dtype=np.int8)
+    frame[60, 10:30] = 7
+    finder = GaugeFinder()
+    assert finder.fatal_when_empty is None
+    for i in range(4):
+        after = frame.copy()
+        after[60, 10 + i] = 3
+        finder.observe(frame, after)
+        frame = after
+    assert finder.observe_restart(0) and finder.fatal_when_empty is True
+
+
 def test_click_game_falls_back_to_the_general_explorer():
     """A game without arrow keys (ft09) must not crash: the agent hands over to the CNN explorer."""
     import arc_agi
