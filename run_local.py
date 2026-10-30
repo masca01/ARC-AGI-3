@@ -8,6 +8,7 @@
     python3 run_local.py --game ls20 --agent causal --steps 1000          # teammate's causal planner
     python3 run_local.py --game ls20 --agent causal-neural --steps 1000   # same, CNN finds the player
     python3 run_local.py --game ls20 --agent causal-neural --html         # interactive replay in outputs/
+    python3 run_local.py --game r11l --agent general --steps 2000         # no game-specific knowledge
 
 Needs ARC_API_KEY in .env. Games download once and are cached in environment_files/.
 """
@@ -25,6 +26,7 @@ import arc_agi
 from arc_agi.rendering import COLOR_MAP, hex_to_rgb
 
 from agent.causal_agent import CausalAgent
+from agent.general_agent import GeneralAgent
 from agent.my_agent import MyAgent
 from replay import save_html
 
@@ -44,12 +46,15 @@ AGENTS = {
     "causal-slides": type("CausalSlides", (CausalAgent,), {"PERCEPTION": "neural", "ORACLE": True, "SLIDES": True}),
     "causal-gauge": type("CausalGauge", (CausalAgent,), {"PERCEPTION": "neural", "ORACLE": True, "SLIDES": True,
                                                          "GAUGE": True}),
+    "general": GeneralAgent,
 }
 
 
 def log_line(agent, latest) -> str:
     s, c = agent.stats(), agent.last_choice
     head = f"  step {agent.action_counter:4d} | lvl {latest.levels_completed}/{latest.win_levels} | "
+    if isinstance(agent, GeneralAgent):
+        return head + f"states {s['states']:4d} | resets {s['resets']:3d} | {c['action']:12s} | {c['why']}"
     if isinstance(agent, CausalAgent):
         return (head + f"attempt {s['attempts']} | CNN player acc {fmt(s['player_acc'])} | "
                 f"{c['action']:8s} | {c['why']}")
@@ -173,9 +178,17 @@ def main() -> None:
             results.append(r)
             if args.gif:
                 save_gif(r["agent"], g)
-            if args.html:
+            if args.html and args.agent == "general":
+                print("  the general agent records no replay yet")
+            elif args.html:
                 save_replay(r, args.agent)
 
+    if args.agent == "general":
+        print("\n======================== SUMMARY ========================")
+        for r in results:
+            print(f"{r['game']:6s} {r['levels']:>3d}/{r['win_levels']:<3d} actions {r['actions']:>5d} "
+                  f"per level {r['level_actions']}  resets {r['resets']}  {r['seconds']:6.1f}s  {r['state']}")
+        return
     if args.agent != "cnn":
         print("\n======================== SUMMARY ========================")
         for r in results:

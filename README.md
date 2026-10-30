@@ -15,6 +15,8 @@ ARC-AGI-3/
 │   ├── objectives.py    game-agnostic tracker of which goals are still open (levels with several doors)
 │   ├── memory.py        game-agnostic object memory: objectives, tiles, refills (used ones too) per level
 │   ├── gauge.py         discovers a resource bar from how it drains, with no place or colour given
+│   ├── general_agent.py plays any game with no game-specific knowledge: exploration graph of states
+│   ├── progress_net.py  experimental CNN: how close a state is to a win (off, no gain so far)
 │   ├── base.py          minimal Agent base class, so the agent runs without the official framework
 │   └── __init__.py      marks agent/ as a Python package
 ├── tests/               regression tests (python3 tests/test_ls20_regression.py)
@@ -246,6 +248,48 @@ refilling while the player is put back, so the lives are no longer read at all.
 
 Still fixed for ls20: the parser's key box, doors, tiles and colours. Run it with `--agent causal-gauge`.
 
+## General agent (`agent/general_agent.py`, `--agent general`)
+
+`CausalAgent` wins ls20 but its parser is written for ls20. `GeneralAgent` plays any game with no knowledge
+of keys, doors, players or colours. It uses no neural network by default.
+
+- **State:** a frame without its resource bars (`gauge.py`) and without whatever differs between two starts of the
+  same level, such as a life icon.
+- **Actions:** the keys the game offers, plus one click per object, an object being a connected patch of colour.
+- **Graph:** every state seen in the level and where each action led. The agent tries an untried action, or walks
+  to the nearest state that has one. Routes must be affordable with the gauge, and refills count.
+- **Memory:** what reacted is remembered by appearance across levels and by place within a level, so
+  dead panels are skipped. Actions that killed the player with energy left are never repeated.
+
+The games were split before any of this was written. Development: ls20, r11l, bp35, ft09. Held out: m0r0, sb26,
+su15, tested once at the end and never tuned on.
+
+Levels solved in 2000 actions. `general` is the number of seeds out of 3 that solved level 1, none solved level 2.
+`cnn` (`MyAgent`) is one run, levels solved.
+
+| Game | Set | `general` | `cnn` (one run) | `causal-slides` (300 actions, 1000 on ls20) |
+|---|---|---|---|---|
+| ls20 | development | 3 of 3 (283-467 actions) | 0 | 7, wins in 443 |
+| r11l | development | 3 of 3 (12-38 actions) | 1 (258 actions) | 1 through its fallback |
+| ft09 | development | 3 of 3 (414-892 actions) | 1 (505 actions) | 0 |
+| bp35 | development | 1 of 3 (880 actions), 3 of 3 with 10000 | 0 | 0 |
+| su15 | held out | 3 of 3 (357-576 actions) | 0 | 0 |
+| m0r0 | held out | 1 of 3 (35 actions) | 1 (1185 actions) | 0 |
+| sb26 | held out | 0 of 3 | 0 | 0 |
+
+**Level 2 is the wall.** No run solved one, on development games even with 10000 actions. Trying every click at the
+start of level 2 shows why: in r11l almost any free pixel reacts and the answer is a computed spot on the
+screen, not an object; ft09 has 13 independent tiles, about 8000 combinations, and the right one must be
+inferred from hint tiles. These levels need a rule to be understood, and more search will not find it.
+
+Tried, no gain, left out (except ProgressNet): preferring less-known actions (no better over 3 seeds, slower first
+levels), and carrying the shapes on a solution over to the next level. ProgressNet (`agent/progress_net.py`,
+`PROGRESS = True`) is a CNN trained after each solved level on the distance to the win read from the graph, meant
+to order exploration on later levels. It solved no level 2 in 3000 actions, so it is off.
+
+The next step is learning what a level asks for: comparing a solved level's final state with its start,
+and clicking at computed places rather than only on objects. The replay viewer does not support `--agent general`; run the same play through `causal-slides` to see it.
+
 ### Other games: held-out test and fallback
 
 With no changes, the ls20 agent solved 0 levels on the other 6 games. ft09, r11l, sb26 and su15 have no
@@ -253,12 +297,12 @@ arrow keys, so the warm-up move list was empty and the agent crashed at the firs
 the self-supervised CNN did learn what the agent controls: a 5x5 object on a **6 px** grid in bp35, and a
 5x25 object on a 5 px grid in m0r0. But the ls20 parser found no ls20-style key, so the planner never ran.
 
-`CausalAgent` now falls back, for the rest of the game, to the general CNN explorer (`MyAgent`, which uses
-every action including clicks) when the game has no arrow keys, when the ls20 parser fails 10 steps in a
+`CausalAgent` falls back, for the rest of the game, to `GeneralAgent` (first `MyAgent`, see below), which uses
+every action including clicks, when the game has no arrow keys, when the ls20 parser fails 10 steps in a
 row although the player was found, or after 40 warm-up moves in a row without a controllable object.
 On ls20 none of these happens (all tests pass).
 
-300 actions per game, one run:
+With `MyAgent` as the fallback, 300 actions per game, one run:
 
 | Game | Switched | Levels: causal + fallback | Levels: `cnn` alone |
 |---|---|---|---|
@@ -272,6 +316,24 @@ On ls20 none of these happens (all tests pass).
 So the fallback removes the crashes and makes the agent as good as the general explorer on these games
 (1 level in total), but no better. The knowledge that made ls20 work (causal tile roles, slides, objectives,
 memory, plans) is not used there yet, because it reaches the planner only through the ls20 parser.
+
+The fallback is now `GeneralAgent`. `causal-slides`, 2000 actions, 3 seeds, measured after the change:
+
+| Game | Switched | Runs solving a level | Actions on level 1 |
+|---|---|---|---|
+| ls20 | never | 3 of 3, all 7 levels | 443 for the whole game |
+| r11l | step 0 | 3 of 3 | 26, 12, 38 |
+| ft09 | step 0 | 3 of 3 | 414, 598, 892 |
+| su15 | step 0 | 3 of 3 | 549, 576, 357 |
+| m0r0 | parser keeps failing | 2 of 3 | 57, 64 |
+| bp35 | parser keeps failing | 1 of 3 | 390 |
+| sb26 | step 0 | 0 of 3 | - |
+
+So one agent now wins ls20 and solves level 1 on 6 of the 7 games, 15 of 21 runs. On games with no arrow keys it
+plays exactly as `general` does. On bp35 and m0r0 the CNN's warm-up moves come first, and the numbers moved a little
+from `general` alone, within what 3 seeds can tell apart. No level 2 here either. A takeover inside a level does not
+count its first frame as the level's start, otherwise the player's cells would be ignored at the next restart.
+The held-out games were run again here to measure this change, and nothing was tuned on them.
 
 ### Results on ls20 (deterministic, one run)
 
@@ -393,9 +455,16 @@ Comparison on the same 6 games and budget (one run each, so a difference of one 
 
 ## Changelog
 
+### 2026-10-30 - GeneralAgent: no game-specific knowledge
+- New `agent/general_agent.py` and `run_local.py --agent general`. Solves level 1 of 6 of 7 games in 2000 actions in
+  at least one of 3 seeds, including 2 of 3 held-out games. No level 2 yet, see the README section.
+
 ### 2026-10-30 - GaugeFinder: the energy bar is discovered, not hard-coded
 - New `agent/gauge.py` and `run_local.py --agent causal-gauge`. Finds a resource bar from how it drains, reads it,
   and learns from a restart that an empty gauge costs a life. ls20 result unchanged: WIN in 443 actions.
+
+### 2026-10-30 - `GeneralAgent` is the fallback
+- `CausalAgent` hands over to `GeneralAgent` instead of `MyAgent`. ls20 is unchanged (WIN in 443 actions). Over 3 seeds at 2000 actions, 15 of 21 runs solve a level. Replays of fallback games show what it did, with no network map.
 
 ### 2026-10-29 - fallback to the general explorer on non-ls20 games
 - `CausalAgent` hands over to `MyAgent` (CNN explorer) when the game has no arrow keys, the ls20 parser keeps failing, or no controllable object is found. Fixes the crash on click games. The replay shows a "switched to general explorer" event.

@@ -11,14 +11,18 @@ from __future__ import annotations
 import logging
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+from arcengine import GameState  # noqa: E402
+
 from agent.causal_agent import CausalAgent  # noqa: E402
 from agent.control_net import find_motion  # noqa: E402
+from agent.general_agent import GeneralAgent  # noqa: E402
 from agent.ls20_specialist import BG, LS20ExtendedStateAgent  # noqa: E402
 
 ORIGINAL_LEVEL_ACTIONS = [13, 45, 41, 148]
@@ -181,8 +185,59 @@ def test_gauge_learns_what_empty_means_from_a_restart():
     assert finder.observe_restart(0) and finder.fatal_when_empty is True
 
 
+def play_general(game: str, max_actions: int):
+    import arc_agi
+    from dotenv import load_dotenv
+
+
+    load_dotenv(ROOT / ".env")
+    logging.disable(logging.CRITICAL)
+    env = arc_agi.Arcade().make(game, include_frame_data=True)
+    agent_cls = type("TestAgent", (GeneralAgent,), {"MAX_ACTIONS": max_actions})
+    agent = agent_cls(card_id="local", game_id=game, agent_name="test", ROOT_URL="http://localhost",
+                      record=False, arc_env=env)
+    agent.main()
+    return agent
+
+
+def test_general_agent_solves_a_first_level_of_keyboard_and_click_games():
+    """One agent with no game knowledge: a keyboard game and a click game, seed 0."""
+    assert play_general("ls20", 400).frames[-1].levels_completed >= 1
+    assert play_general("r11l", 60).frames[-1].levels_completed >= 1
+
+
+def test_general_agent_objects_leave_out_background_and_ignored_pixels():
+    from agent.general_agent import objects
+
+    frame = np.full((64, 64), 3, dtype=np.uint8)
+    frame[10:14, 10:14] = 7
+    frame[50:54, 50:54] = 7
+    frame[63, :] = 9
+    ignore = np.zeros((64, 64), bool)
+    ignore[63, :] = True
+    targets = objects(frame, ignore)
+    assert len(targets) == 2                                # no background, no ignored bar
+    assert targets[0].kind == targets[1].kind               # same look, same kind of object
+    assert all(frame[y, x] == 7 for x, y in (t.action for t in targets))
+
+
+def test_general_agent_routes_must_be_affordable():
+    from agent.general_agent import LevelGraph, Node
+
+    blank = np.zeros((64, 64), dtype=np.uint8)
+    graph = LevelGraph()
+    graph.nodes = {k: Node([], blank) for k in (b"a", b"b", b"c", b"refill")}
+    graph.nodes[b"a"].edges = {1: (b"b", 5), 2: (b"refill", 1)}
+    graph.nodes[b"refill"].edges = {3: (b"b", -20)}
+    graph.nodes[b"b"].edges = {4: (b"c", 8)}
+    goal = lambda key: key == b"c"
+    assert graph.route(b"a", goal, 20) == [1, 4]            # shortest, when it is affordable
+    assert graph.route(b"a", goal, 10) == [2, 3, 4]         # through the refill, when it is not
+    assert graph.route(b"a", goal, 1) is None
+
+
 def test_click_game_falls_back_to_the_general_explorer():
-    """A game without arrow keys (ft09) must not crash: the agent hands over to the CNN explorer."""
+    """A game without arrow keys (ft09) must not crash: the agent hands over to GeneralAgent."""
     import arc_agi
     from dotenv import load_dotenv
 
@@ -194,7 +249,24 @@ def test_click_game_falls_back_to_the_general_explorer():
                       record=False, arc_env=env)
     agent.main()
     assert agent.fallback == "the game has no arrow keys"
+    assert isinstance(agent.explorer, GeneralAgent)
     assert agent.action_counter > 30
+
+
+def test_general_agent_taking_over_midway_does_not_take_that_frame_for_the_start():
+    """Taken over mid-level, the first frame is not a start, or the player's cells get ignored at the next restart."""
+    agent = GeneralAgent(card_id="local", game_id="test", agent_name="test", ROOT_URL="http://localhost",
+                         record=False, arc_env=None)
+    agent.take_over(0, midway=True)
+    playing = SimpleNamespace(state=GameState.NOT_FINISHED, levels_completed=0, available_actions=[1, 2],
+                              frame=[np.zeros((64, 64), int).tolist()])
+    agent.choose_action([], playing)
+    assert agent.level_start is None
+    agent.choose_action([], SimpleNamespace(**{**vars(playing), "state": GameState.GAME_OVER}))
+    start = np.zeros((64, 64), int)
+    start[10, 10] = 3
+    agent.choose_action([], SimpleNamespace(**{**vars(playing), "frame": [start.tolist()]}))
+    assert (agent.level_start == start).all() and not agent.ignore.any()
 
 
 def test_object_memory_keeps_used_refills_for_the_next_attempt():
