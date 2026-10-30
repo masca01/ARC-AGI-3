@@ -1,6 +1,7 @@
 arc-agi>=0.9.6
 arcengine
 numpy
+scipy
 torch
 python-dotenv
 matplotlib
