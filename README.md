@@ -12,6 +12,8 @@ ARC-AGI-3/
 │   ├── ls20_specialist.py  teammate's ls20 causal planner, ported (see below)
 │   ├── control_net.py   CNN that learns what the agent controls, from its own moves
 │   ├── slide_net.py     CNN that learns from one or two surprises which icons push the player, and where
+│   ├── objectives.py    game-agnostic tracker of which goals are still open (levels with several doors)
+│   ├── memory.py        game-agnostic object memory: objectives, tiles, refills (used ones too) per level
 │   ├── base.py          minimal Agent base class, so the agent runs without the official framework
 │   └── __init__.py      marks agent/ as a Python package
 ├── tests/               regression tests (python3 tests/test_ls20_regression.py)
@@ -117,6 +119,79 @@ the first time the agent met them**, and every pusher that surprised it once was
 time (`nY`). Over the game: 37 of 42 pushes predicted before they happened, 5 surprises, 0 false alarms,
 and 1 stored non-local move instead of 101.
 
+### Several goals per level: ObjectiveTracker (`agent/objectives.py`, `OBJECTIVES = True`)
+
+Level 6 has two doors. The agent solved the first, the door disappeared, but the planner kept it in
+memory as a goal. Because the key matched that door, the planner's key lock also refused any tile that
+would change the key, so it could never prepare the key for door 2. It wandered until the resource ran
+out, the game put both doors back, and the loop repeated every ~43 actions.
+
+`ObjectiveTracker` knows nothing about doors or keys. Perception gives it the goal candidates it sees
+each step (position, pixel box), and it decides from observation alone:
+- **achieved:** the goal is no longer detected *and* its pixels that the player does not cover look
+  different. This is object permanence: a goal only hidden behind the player still shows its uncovered
+  border unchanged.
+- **reopened:** an achieved goal becomes visible again (after a lost life the game puts it back).
+- **no effect:** the player stood on it and left, and it was still there. After 2 such visits it is
+  ranked behind the other open goals, so the agent tries another objective instead of looping.
+- If every goal looks achieved but the level has not ended, the tracker distrusts itself and reopens
+  them.
+
+The planner only aims for, and only locks the key for, open goals. Achieved doors become floor. To use
+it in another game, the perception only has to hand over that game's goal candidates.
+
+### Limited vision: exploring to discover the objective (level 7)
+
+Level 7 shows only a disc of about 18 px around the player. Everything else is background colour 5, the
+same colour the HUD key box and the door boxes use. Before, the hand-made parser could no longer find
+the key box, the planner never ran, and the agent only made fallback moves. Changes, all in
+`ls20_specialist.py`, none of which change anything on fully visible levels:
+- **Darkness is not wall:** background-coloured regions connected to the screen border are "unseen".
+  Cells count as seen only when fully lit.
+- **Map memory:** floor, tiles and doors stay remembered when they go out of sight. "Out of sight" is
+  never treated as "gone" (tiles, objectives) or "moved" (a tile only moves if it reappears at most 2
+  cells away; the same icon far away is another copy).
+- **HUD stability:** HUD elements do not move. Once the key box was found cleanly, a box found elsewhere
+  or of another size is the real box merged with darkness, so the key is read where it was before.
+  This was the hardest bug: near the bottom-left the light cut the HUD box, the key was read 2 px off,
+  and the agent cycled through shapes forever.
+- **Frontier exploration:** when no objective or plan is known, go to the nearest known floor cell next
+  to unseen space (`explore:reveal`). The agent commits to that target (or to the refill it needs first)
+  until reached, instead of re-deciding every step, which made it ping-pong.
+- **Budget before the door:** if the key fits an open door and a plan exists with a full budget but not
+  with the current one, go to a refill first (`recharge-before-door`).
+
+With these changes alone the agent explored level 7, discovered the door and the tiles, and built the
+right key, but kept running out of resource. The object memory below solved it.
+
+### Object memory (`agent/memory.py`, `MEMORY = True`): solving level 7
+
+To solve a dark level the agent must remember what it saw: the objective's pattern, where the
+transformer tiles are, and where every refill is. That includes used refills, because the game puts
+them back after a lost life. Before, a used refill vanished from view and was deleted, so after a lost
+life the agent knew only 3 of the 6 refills of level 7 and could never budget the task. `ObjectMemory`
+keeps every significant object by position, with a status changed only on evidence:
+- **present:** detected there, or remembered there while its cell is dark;
+- **hidden:** the player stands on it, so it is kept;
+- **used:** it vanished right after the player touched it (a refill was consumed). It is kept, not
+  usable until the attempt restarts. A lost life or game over makes it present again;
+- **gone:** it vanished from a fully lit cell without the player being involved. Only then is it
+  forgotten.
+
+Two related memory fixes were needed:
+- **Moving objects across restarts:** after a lost life the planner re-anchors a moving tile's cycle
+  only if the tile is in sight. In the dark it was out of sight, so the rotator's learned 10-step cycle
+  was wiped. The planner could then not time the two rotations the key needed, and no plan existed even
+  with 4 million search states. A restart also puts mechanisms back at their start, so an out-of-sight
+  cycle is now kept.
+- **Careful exploration:** exploratory moves treat known mechanism tiles as obstacles unless they are
+  the target, so exploring never undoes progress on the key by accident. Before, the agent stepped back
+  over the colour tile after getting the right colour.
+
+Result: **level 7 is solved in 219 actions (human baseline 186), and the whole game is won: 7/7 levels in
+611 actions, without a single game over.** Memory at the end of level 7: goal 1/1, refills 6/6, tiles
+2/2.
+
 ### Results on ls20 (deterministic, one run)
 
 | Agent | Levels | Actions on levels 1 / 2 / 3 / 4 | CNN finds the player's cell |
@@ -125,14 +200,18 @@ and 1 stored non-local move instead of 101.
 | `cnn` (MyAgent v2, 300 actions) | 0 | - | - |
 | `causal` (hand-made perception) | 4 | 13 / 45 / 41 / 148 | - |
 | `causal-neural` (CNN perception) | 4 | 25 / 45 / 41 / 148 | 100% of 449 frames, levels 1-5 |
-| `causal-slides` (CNN perception + SlideNet) | **5** | 25 / 45 / 41 / **86** / **126** (level 5) | 100% |
+| `causal-slides` (CNN perception + SlideNet + objectives) | 6 | 25 / 45 / 41 / 86 / 126 / 88 (levels 5, 6) | 100% |
+| `causal-slides` + limited vision + object memory | **7 (WIN)** | 25 / 45 / 41 / 135 / 58 / 88 / **219** | 98.3% |
 
 With the CNN, levels 2-4 are solved in exactly the same moves as with the hand-made detector. Level 1
 costs the 12 warm-up moves the CNN needs to learn what it controls. Without SlideNet, level 5 is
 unsolved: with 1000 actions the agent retries it 4 times (751 actions) and runs out of resource each
 time. With SlideNet it is solved in 126 actions (human baseline 96) and level 4 drops from 148 to 86.
-Level 6 is not solved yet. In 673 actions and 5 attempts the agent takes the same (correctly
-predicted) pusher 16 times, so the planner is going round in a loop there.
+Level 6 (two doors) is solved in 88 actions (human baseline 192) once objectives are tracked. Before,
+the agent looped for 673 actions. Level 7 (limited vision) is solved with
+the object memory; see above. Careful exploration made level 4 slower (135 instead of 86) and level 5
+faster (58 instead of 126). In the dark the CNN loses the player on a few frames (98.3% overall, 10
+warm-up moves on level 7).
 
 Things that went wrong on the way (useful for the report):
 - Handing the CNN to the planner after 2 labelled moves: its blob still covered floor pixels, the grid
@@ -184,7 +263,10 @@ python3 run_local.py --game ls20 --agent cnn --html                          # o
 - **Decision and state**: the action, the planner's reason, the carried key next to the door goal,
   resource, lives, what the CNN has learned (grid, trust, training steps), and events at this step.
 - **Timeline**: levels, warm-up moves and events (level solved, game over, tile rule learned,
-  non-local move learned, push predicted, surprise push, CNN miss, CNN milestone). Below it are curves for CNN confidence, resource and
+  non-local move learned, push predicted, surprise push, objective update, CNN miss, CNN milestone).
+  Objectives are drawn as a green "open goal" box or a dashed "achieved" box. With limited vision the
+  "map memory" overlay shows remembered floor in the dark (grey) and the frontier cells still to explore
+  (cyan circles). Below it are curves for CNN confidence, resource and
   loss. Click anywhere to jump there, or use the event buttons or <kbd>N</kbd>/<kbd>P</kbd> to jump from
   event to event.
 
@@ -228,6 +310,23 @@ Comparison on the same 6 games and budget (one run each, so a difference of one 
 - The causal agent only works on `ls20`: everything except the player detector still assumes ls20's colours, 5 px grid and HUD layout, and it never clicks.
 
 ## Changelog
+
+### 2026-10-29 - object memory: ls20 won (7/7)
+- Added `agent/memory.py`: a game-agnostic object memory of goals (with their pattern), tiles (with their role) and refills, with present/hidden/used/gone statuses, and restoration of used objects after a restart.
+- The planner keeps remembered tiles instead of deleting them when they are hidden under the player or used, marks used refills as consumed, and restores them after a lost life (`use_memory`). Moving tiles keep their learned cycle across restarts when out of sight. Exploratory moves avoid known mechanisms (`careful_exploration`).
+- Replay shows the object memory (goals, refills hollow when used, tiles) and memory events.
+- Result: ls20 won, 7/7 levels in 611 actions (level 7 in 219). Tests added: full-game win and memory unit test. The SlideNet test now allows up to 2 false alarms (one occurs on the new trajectory and is fast-learned).
+
+### 2026-10-29 - limited vision: map memory and frontier exploration
+- Darkness detection, map memory (seen cells, remembered tiles/doors/slides), HUD-stability key reading, frontier exploration with commitment, and refill-before-door budget planning in `ls20_specialist.py`. The ObjectiveTracker ignores pixels in darkness and reports "discovered" events.
+- Replay shows remembered map and frontier.
+- Result: on level 7 the agent discovers the door and tiles and builds the correct key, but runs out of resource before reaching the door. Levels 1-6 unchanged (all tests pass).
+
+### 2026-10-29 - ObjectiveTracker: several goals per level
+- Added `agent/objectives.py`: a game-agnostic tracker that marks goals achieved when they are gone (not just hidden behind the player), reopens them when they come back, and ranks goals that did not react behind the others.
+- The planner aims for and key-locks only on open doors (`track_objectives`, `CausalAgent.OBJECTIVES`, on by default). Door boxes are passed to the tracker.
+- Replay shows objectives and objective events.
+- Result on ls20: 6 levels (level 6 in 88 actions, previously stuck). Levels 1-5 unchanged. Tests added.
 
 ### 2026-10-29 - SlideNet: learning slides from one or two surprises
 - Added `agent/slide_net.py`. A CNN predicts from a cell's look whether entering it pushes the player and in which direction. The end is "until the next wall", plus remembered exceptions. Surprises trigger 40 immediate gradient steps with rotation/reflection augmentation.

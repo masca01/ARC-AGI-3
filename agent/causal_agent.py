@@ -45,6 +45,8 @@ class CausalAgent(Agent):
     PERCEPTION = "heuristic"     # or "neural"
     ORACLE = False               # neural only: also run the hand-made detector, for accuracy stats
     SLIDES = False               # learn pushes with SlideNet
+    OBJECTIVES = True            # track which goals are still open (several doors per level)
+    MEMORY = True                # remember objectives, tiles and refills (including used ones)
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
@@ -52,6 +54,9 @@ class CausalAgent(Agent):
         self.perception = ControlPerception(seed=0) if self.PERCEPTION == "neural" else None
         if self.perception is not None:
             self.planner.locate_player = self.perception.locate
+        self.planner.track_objectives = self.OBJECTIVES
+        self.planner.use_memory = self.MEMORY
+        self.planner.careful_exploration = self.MEMORY
         self.slides = SlideLearner(seed=0) if self.SLIDES else None
         self.slide_events: list = []             # filled by the slide hook during this step
         if self.slides is not None:
@@ -126,6 +131,9 @@ class CausalAgent(Agent):
                 events.append(("edge", f"non-local move {edge.source} -> {edge.destination} "
                                        f"({len(self.planner.dynamic_edges)} known this level)"))
         events += self.slide_events
+        if planned:
+            events += [("goal", text) for _, text in self.planner.objective_events]
+            events += [("memory", text) for _, text in self.planner.memory_events]
         self.prev = (frame, action.value)
         self.level_actions[level] += 1
         self._record(frame, action, why, level, events, motion, oracle, planned)
@@ -187,7 +195,8 @@ class CausalAgent(Agent):
                 target=px((int(target[1]), int(target[2]))) if target else (px(cells[-1]) if len(cells) > 1 else None),
                 tiles=[(*px(pos), ROLE_LABELS.get(self.planner.models[t.signature].role, "?")
                         if t.signature in self.planner.models else "?") for pos, t in self.planner.tiles.items()],
-                doors=[px(d.pos) for d in self.planner.doors.values()])
+                doors=[px(d.pos) for d in self.planner.doors.values()],
+                objectives=[(*px(o.pos), o.status, o.no_effect) for o in self.planner.objectives.objectives.values()])
             if oracle is not None and oracle[0] is not None:
                 (r, c), (gy, gx) = oracle[0]
                 step["overlay"]["oracle_box"] = (gy + 5 * r, gx + 5 * c, 5, 5)
@@ -196,13 +205,22 @@ class CausalAgent(Agent):
                                              for c, (k, pr, end) in self.slides.last_table.items()
                                              if k and end is not None and pr >= 0.5]
                 step["info"].update({f"slides: {k}": v for k, v in self.slides.stats().items()})
+            dark_memory = (self.planner.free_memory - scene.visible_cells) if scene.unseen is not None and scene.unseen[:53].any() else set()
+            step["overlay"]["memory"] = [px(c) for c in dark_memory]
+            step["overlay"]["frontier"] = [px(c) for c in self.planner.frontier(scene)]
+            if self.MEMORY:
+                step["overlay"]["remembered"] = [(*px(i.cell), i.kind, i.status) for i in self.planner.memory.items.values()]
+                step["info"]["memory"] = self.planner.memory.summary()
+            step["info"]["map"] = (f"{len(self.planner.seen_cells)} cells seen, "
+                                   f"{len(scene.grid_cells - self.planner.seen_cells)} unknown")
             step["info"].update({"player cell": scene.player, "plan length": len(self.planner.last_plan),
                                  "needs": self.planner.required_role(scene) or "-",
                                  "learned roles": ", ".join(sorted({ROLE_LABELS.get(m.role, m.role)
                                                                      for m in self.planner.models.values()})) or "-",
-                                 "non-local moves known": len(self.planner.dynamic_edges)})
+                                 "non-local moves known": len(self.planner.dynamic_edges),
+                                 "objectives": self.planner.objectives.summary() if self.OBJECTIVES else "off"})
             step["key"] = list(scene.key)
-            step["goals"] = [list(d.goal) for d in self.planner.doors.values()]
+            step["goals"] = [list(d.goal) for d in self.planner.open_doors().values()]
             step["stats"].update(resource=scene.resource, lives=scene.lives)
         maps = step.get("maps")
         step["heat"] = maps[0][1].astype(np.float32) if maps else np.zeros(frame.shape)

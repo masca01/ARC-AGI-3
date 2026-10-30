@@ -8,10 +8,27 @@ Ported unchanged except for:
     same level is retried while keeping everything learned about it,
   - `slide_model` (SlideNet in slide_net.py) predicts pushes from how cells look. Planning uses
     those predictions wherever no exact observation exists, and confidently predicted pushers are
-    not re-tested. None keeps the original behaviour.
+    not re-tested. None keeps the original behaviour,
+  - `track_objectives` (ObjectiveTracker in objectives.py) keeps track of which doors are still open.
+    A door that disappeared after being solved is no longer a goal, so in levels with several doors the
+    agent moves on to the next one. False keeps the original behaviour (every door ever seen stays a
+    goal, which deadlocks after the first door: the key stays locked to the solved door),
+  - limited vision (level 7 shows only a disc around the player): darkness is told apart from walls,
+    everything seen is remembered when it goes out of view, the HUD key is read where it was on earlier
+    levels, and when no objective is known the agent walks to the edge of the known map to reveal more
+    (frontier exploration). On fully visible levels none of this changes anything,
+  - `use_memory` (ObjectMemory in memory.py) remembers every significant object of the level: the
+    objective and its pattern, transformer tiles, and every refill, including used ones, which come
+    back after a lost life. A remembered tile is only forgotten when it vanished from a fully lit cell
+    without the player being involved. False keeps the original behaviour (a tile that is not detected
+    in view is deleted, so used refills are forgotten for the rest of the level),
+  - `careful_exploration`: exploratory moves (reveal, frontier, gate tests, refills, fallback) treat
+    known mechanism tiles as obstacles unless they are the target, so exploring never undoes progress
+    on the key by accident. Deliberate experiments and the solution plan still use them.
 """
 from __future__ import annotations
 
+import dataclasses
 import hashlib
 import json
 import math
@@ -22,6 +39,9 @@ from typing import Callable, Dict, Iterable, List, Optional, Tuple
 
 import numpy as np
 from arcengine import GameAction, GameState
+
+from .memory import ObjectMemory
+from .objectives import ObjectiveTracker
 
 Pos = Tuple[int, int]
 Key = Tuple[int, ...]
@@ -95,6 +115,7 @@ class Tile:
 class Door:
     pos: Pos
     goal: Key
+    box: Optional[Tuple[int, int, int, int]] = None   # y0, x0, y1, x1 of the goal box in pixels
 
 
 @dataclass(frozen=True)
@@ -168,6 +189,11 @@ class MovingTrack:
         old_period = self.period
         old_phases = self.phase_positions
         visible = list(visible)
+        if not visible and old_phases:
+            # Out of sight at the restart (limited vision): the restart puts mechanisms back at their
+            # start too, so the learned cycle still holds with the tick counter back at 0. Keep it
+            # instead of forgetting it. (When the object is in sight it is re-anchored as before.)
+            return
         self.history = [(0, visible[0])] if visible else []
         self.confidence = 0.0
         self.period = old_period
@@ -201,6 +227,9 @@ class Scene:
     lives: int
     gates: List[Gate]
     dynamic_config: DynamicConfig
+    unseen: Optional[np.ndarray] = None                     # (64, 64) bool: darkness, nothing visible
+    visible_cells: set = field(default_factory=set)         # grid cells fully in sight right now
+    grid_cells: set = field(default_factory=set)            # every cell of the playing area
 
 
 @dataclass
@@ -238,6 +267,14 @@ class LS20ExtendedStateAgent:
         self.locate_player: Optional[Callable[[np.ndarray], Optional[Tuple[Pos, Pos]]]] = None
         # (previous scene, previous action, scene) -> {cell: (class, probability, slide end)}; None = off
         self.slide_model: Optional[Callable] = None
+        self.track_objectives = False
+        self.use_memory = False
+        self.careful_exploration = False
+        self.memory = ObjectMemory()
+        self.memory_events: List[Tuple[str, str]] = []
+        self.key_box: Optional[Tuple[int, int, int, int]] = None   # HUD key box (x0, y0, w, h), kept across levels
+        self.objectives = ObjectiveTracker()
+        self.objective_events: List[Tuple[str, str]] = []
         self.reset_episode()
 
     def reset_episode(self) -> None:
@@ -252,6 +289,8 @@ class LS20ExtendedStateAgent:
         self.tiles: Dict[Pos, Tile] = {}
         self.doors: Dict[Pos, Door] = {}
         self.free_memory: set[Pos] = set()
+        self.seen_cells: set[Pos] = set()           # cells ever visible this level (map memory)
+        self.reveal_intent: Optional[Tuple[str, Pos]] = None   # committed exploration target
         self.consumed: set[Pos] = set()
         self.blocked_edges: set[Tuple[Pos, Pos]] = set()
         self.dynamic_edges: Dict[Tuple[Pos, int, DynamicConfig], DynamicTransition] = {}
@@ -324,14 +363,15 @@ class LS20ExtendedStateAgent:
         return pos, origin
 
     @classmethod
-    def extract_symbols(cls, frame: np.ndarray) -> Tuple[Key, List[Tuple[Tuple[int, int, int, int], Key]]]:
+    def extract_symbols(cls, frame: np.ndarray):
+        """(carried key or None, door goals, key box (x0, y0, w, h) or None)."""
         boxes = []
         for points in cls.components(frame == BG):
             if len(points) < 20:
                 continue
             ys, xs = zip(*points)
             boxes.append((min(xs), min(ys), max(xs), max(ys)))
-        current = None
+        current, key_box = None, None
         goals = []
         for x0, y0, x1, y1 in boxes:
             width, height = x1 - x0 + 1, y1 - y0 + 1
@@ -339,13 +379,12 @@ class LS20ExtendedStateAgent:
                 patch = frame[y0 + 2:y0 + 8, x0 + 2:x0 + 8]
                 if patch.shape == (6, 6):
                     current = tuple(map(int, patch.reshape(3, 2, 3, 2)[:, 0, :, 0].ravel()))
+                    key_box = (x0, y0, x1 - x0 + 1, y1 - y0 + 1)
             elif width == 7 and height == 7:
                 patch = frame[y0 + 2:y0 + 5, x0 + 2:x0 + 5]
                 if patch.shape == (3, 3):
                     goals.append(((x0, y0, x1, y1), tuple(map(int, patch.ravel()))))
-        if current is None:
-            raise RuntimeError("Could not extract the current 3x3 key")
-        return current, goals
+        return current, goals, key_box
 
     @staticmethod
     def tile_signature(patch: np.ndarray) -> str:
@@ -416,37 +455,72 @@ class LS20ExtendedStateAgent:
             if located is None:
                 raise RuntimeError("player locator found no player")
             player, origin = located
-        key, raw_goals = self.extract_symbols(frame)
+        key, raw_goals, key_box = self.extract_symbols(frame)
+        if self.key_box is None and key_box is not None:
+            self.key_box = key_box
+        if self.key_box is not None and key_box != self.key_box:
+            # HUD elements do not move. A box elsewhere or of another size is the real box merged with
+            # darkness (limited vision): read the key where the box was found cleanly before.
+            x0, y0 = self.key_box[:2]
+            patch = frame[y0 + 2:y0 + 8, x0 + 2:x0 + 8]
+            if patch.shape == (6, 6):
+                key = tuple(map(int, patch.reshape(3, 2, 3, 2)[:, 0, :, 0].ravel()))
+        if key is None:
+            raise RuntimeError("Could not extract the current 3x3 key")
+        unseen = self.darkness(frame)
         oy, ox = origin
         doors = []
         for (x0, y0, x1, y1), goal in raw_goals:
             cy, cx = (y0 + y1) // 2, (x0 + x1) // 2
             pos = (int(round((cy - oy) / 5)), int(round((cx - ox) / 5)))
-            doors.append(Door(pos, goal))
+            doors.append(Door(pos, goal, (y0, x0, y1, x1)))
         door_positions = {d.pos for d in doors}
         free: set[Pos] = set()
         tiles: Dict[Pos, Tile] = {}
+        visible_cells: set[Pos] = set()
+        grid_cells: set[Pos] = set()
         special_colors = {0, 1, 2, 6, 7, 8, 10, 11, 13, 14, 15}
         for r, y in enumerate(range(oy, min(60, frame.shape[0] - 4), 5)):
             for c, x in enumerate(range(ox, min(60, frame.shape[1] - 4), 5)):
                 patch = frame[y:y + 5, x:x + 5]
                 hist = Counter(map(int, patch.ravel()))
                 pos = (r, c)
+                if y < 53:
+                    grid_cells.add(pos)
+                in_sight = not unseen[y:y + 5, x:x + 5].any()     # fully lit: the only cells we judge
+                if in_sight:
+                    visible_cells.add(pos)
                 floor = hist[3] >= 8
                 is_player = hist[12] >= 8 if self.locate_player is None else pos == player
                 pickup = hist[11] >= 8
                 if floor or is_player or pos in door_positions:
                     free.add(pos)
                 salience = sum(hist[k] for k in special_colors)
-                if y < 53 and (floor or pickup) and salience >= 2 and not is_player and pos not in door_positions:
+                if y < 53 and in_sight and (floor or pickup) and salience >= 2 and not is_player and pos not in door_positions:
                     tiles[pos] = Tile(pos, self.tile_signature(patch), "pickup_visual" if pickup else "mechanism")
         free.add(player)
         gates = self.detect_gates(frame, origin)
+        visible_cells.add(player)
         return Scene(
             frames, frame, level, player, origin, free, tiles, doors, key,
             self.resource(frame), self.lives(frame), gates,
-            self.dynamic_configuration(frame, gates),
+            self.dynamic_configuration(frame, gates), unseen, visible_cells, grid_cells,
         )
+
+    @classmethod
+    def darkness(cls, frame: np.ndarray) -> np.ndarray:
+        """Pixels that show nothing: background-coloured regions connected to the screen border.
+
+        Door and key boxes use the same colour but are enclosed, so they are not darkness. On fully
+        visible levels this only covers the margin and the HUD background, outside the playing area.
+        """
+        dark = np.zeros(frame.shape, bool)
+        h, w = frame.shape
+        for points in cls.components(frame == BG):
+            ys, xs = zip(*points)
+            if min(ys) == 0 or min(xs) == 0 or max(ys) == h - 1 or max(xs) == w - 1:
+                dark[tuple(np.array(points).T)] = True
+        return dark
 
     @staticmethod
     def key_array(key: Key) -> np.ndarray:
@@ -476,11 +550,16 @@ class LS20ExtendedStateAgent:
         self.level = scene.level
         self.tiles = {}
         self.doors = {}
+        self.objectives.reset_level()
+        self.memory.reset_level()
+        self.slides = {}
         self.free_memory = set()
         self.consumed = set()
         self.blocked_edges = set()
         self.dynamic_edges = {}
         self.dynamic_rules = {}
+        self.seen_cells = set()
+        self.reveal_intent = None
         self.moving_signatures = set()
         self.signature_positions = {}
         self.moving_tracks = {}
@@ -495,6 +574,23 @@ class LS20ExtendedStateAgent:
     def merge_scene(self, scene: Scene) -> None:
         self.level_tick += 1
         self.free_memory |= scene.free
+        self.seen_cells |= scene.visible_cells
+        visible = scene.visible_cells
+        self.memory_events = []
+        if self.use_memory:
+            detections = {}
+            for pos, tile in scene.visible_tiles.items():
+                if tile.signature in self.moving_signatures:
+                    continue                                  # moving tiles are tracked, not placed
+                model = self.models.get(tile.signature)
+                refill = tile.kind == "pickup_visual" or (model is not None and model.role == "resource")
+                detections[pos] = ("refill" if refill else "tile", tile.signature,
+                                   model.role if model is not None else None)
+            for door in scene.doors:
+                detections[door.pos] = ("goal", "goal", door.goal)
+            previous_player = self.last_scene.player if self.last_scene is not None else None
+            self.memory_events = self.memory.observe(self.level_tick, detections, scene.visible_cells,
+                                                     scene.player, previous_player)
         current_positions: Dict[str, set[Pos]] = {}
         by_signature: Dict[str, Dict[Pos, Tile]] = {}
         for pos, tile in scene.visible_tiles.items():
@@ -504,12 +600,19 @@ class LS20ExtendedStateAgent:
         all_signatures = set(self.signature_positions) | set(current_positions)
         for signature in all_signatures:
             positions = current_positions.get(signature, set())
-            previous = self.signature_positions.get(signature, set())
+            remembered = self.signature_positions.get(signature, set())
+            # out of sight is not gone: only judge the positions that can be seen now
+            hidden = {p for p in remembered if p not in visible}
+            previous = remembered - hidden
             track = self.moving_tracks.setdefault(signature, MovingTrack(signature))
             if len(positions) == 1:
                 track.observe(self.level_tick, next(iter(positions)))
             if previous and positions and previous != positions and len(previous) == len(positions) == 1:
-                self.moving_signatures.add(signature)
+                (a, b), (c, d) = next(iter(previous)), next(iter(positions))
+                # moving tiles step a cell at a time; the same icon far away is another copy
+                # (with limited vision the two copies are never in sight together)
+                if abs(a - c) + abs(b - d) <= 2:
+                    self.moving_signatures.add(signature)
             if signature in self.moving_signatures:
                 for pos in list(self.tiles):
                     if self.tiles[pos].signature == signature:
@@ -517,8 +620,13 @@ class LS20ExtendedStateAgent:
             else:
                 for stale in previous - positions:
                     if stale in self.tiles and self.tiles[stale].signature == signature:
+                        item = self.memory.items.get(stale) if self.use_memory else None
+                        if item is not None and item.signature == signature:
+                            if item.status == "used":
+                                self.consumed.add(stale)      # used, not gone: it comes back after a restart
+                            continue                          # remembered (under the player, or used)
                         del self.tiles[stale]
-            self.signature_positions[signature] = set(positions)
+            self.signature_positions[signature] = set(positions) | (hidden if signature not in self.moving_signatures else set())
 
         self.current_mobile_tiles = {}
         for pos, tile in scene.visible_tiles.items():
@@ -532,6 +640,25 @@ class LS20ExtendedStateAgent:
                 old.kind = tile.kind
         for door in scene.doors:
             self.doors[door.pos] = door
+        self.objective_events = []
+        if self.track_objectives:
+            seen_doors = {door.pos: (door.pos, door.box, door.goal) for door in scene.doors}
+            py, px = scene.origin[0] + 5 * scene.player[0], scene.origin[1] + 5 * scene.player[1]
+            self.objective_events = self.objectives.update(self.level_tick, seen_doors, scene.player,
+                                                           scene.frame, (py, px, py + 4, px + 4),
+                                                           None if scene.unseen is None else ~scene.unseen)
+            if self.doors and not self.objectives.open():
+                # every goal looks achieved but the level did not end: the tracker was wrong somewhere
+                for objective in self.objectives.objectives.values():
+                    objective.status = "open"
+                self.objective_events.append(("reopened", "all objectives looked done but the level "
+                                                          "did not end: reopening them"))
+
+    def open_doors(self) -> Dict[Pos, Door]:
+        """Doors that are still goals (all remembered doors when objective tracking is off)."""
+        if not self.track_objectives:
+            return self.doors
+        return {pos: door for pos, door in self.doors.items() if self.objectives.is_open(pos)}
 
     def temporal_cycle(self) -> int:
         periods = [
@@ -647,6 +774,8 @@ class LS20ExtendedStateAgent:
         if reset:
             self.pending_restart = False
             self.consumed.clear()
+            if self.use_memory:
+                self.memory.restart(self.level_tick)
             self.blocked_edges.clear()
             self.dynamic_edges = {
                 key: edge for key, edge in self.dynamic_edges.items()
@@ -737,9 +866,29 @@ class LS20ExtendedStateAgent:
             result = predicted
         return result, True, contacted_target
 
+    def mechanism_cells(self) -> set:
+        """Cells of known tiles that change the key (anything that is not a refill)."""
+        cells = set()
+        for pos, tile in self.tiles.items():
+            model = self.models.get(tile.signature)
+            if tile.kind != "pickup_visual" and not (model and model.role == "resource"):
+                cells.add(pos)
+        return cells
+
+    def careful_plan(self, scene: Scene, target: Pos, max_nodes: int = 30000,
+                     fallback: bool = True) -> Optional[List[GameAction]]:
+        """An exploratory path that steps on no mechanism (except the target), if one exists."""
+        if not self.careful_exploration:
+            return self.joint_plan(scene, target, False, max_nodes)
+        path = self.joint_plan(scene, target, False, max_nodes, avoid=self.mechanism_cells() - {target})
+        if path is None and fallback:
+            path = self.joint_plan(scene, target, False, max_nodes)
+        return path
+
     def joint_plan(self, scene: Scene, target: Optional[Pos] = None,
                    allow_unknown_target: bool = False, max_nodes: int = 140000,
-                   mobile_target_signature: Optional[str] = None) -> Optional[List[GameAction]]:
+                   mobile_target_signature: Optional[str] = None,
+                   avoid: Optional[set] = None) -> Optional[List[GameAction]]:
         free = set(self.free_memory)
         free.add(scene.player)
         free.update(self.doors)
@@ -759,7 +908,8 @@ class LS20ExtendedStateAgent:
         queue = deque([start])
         previous = {start: None}
         previous_action = {}
-        goal_keys = {door.goal for door in self.doors.values()}
+        open_doors = self.open_doors()
+        goal_keys = {door.goal for door in open_doors.values()}
         nodes = 0
         while queue and nodes < max_nodes:
             state = queue.popleft()
@@ -772,7 +922,7 @@ class LS20ExtendedStateAgent:
                 if transition is None:
                     continue
                 nxt, next_config = transition
-                if nxt not in free:
+                if nxt not in free or (avoid and nxt in avoid):
                     continue
                 if resource < self.step_cost and nxt not in pickups:
                     continue
@@ -792,7 +942,7 @@ class LS20ExtendedStateAgent:
                     continue
                 if key in goal_keys and new_key != key:
                     continue
-                door = self.doors.get(nxt)
+                door = open_doors.get(nxt)
                 if door and door.goal != new_key:
                     continue
                 new_state = (nxt, new_key, new_resource, new_mask, next_config, next_phase)
@@ -831,10 +981,12 @@ class LS20ExtendedStateAgent:
         )
 
     def required_role(self, scene: Scene) -> Optional[str]:
-        if not self.doors:
+        doors = self.open_doors()
+        if not doors:
             return None
-        goal = min((door.goal for door in self.doors.values()),
-                   key=lambda candidate: self.goal_discrepancy(scene.key, candidate))
+        # objectives that did not react to repeated visits come last, then the closest key match
+        goal = min(doors.values(), key=lambda door: (self.objectives.penalty(door.pos) if self.track_objectives else 0,
+                                                    self.goal_discrepancy(scene.key, door.goal))).goal
         if scene.key == goal:
             return "door"
         if self.canonical_shape(scene.key) != self.canonical_shape(goal):
@@ -870,7 +1022,7 @@ class LS20ExtendedStateAgent:
             is_resource = tile.kind == "pickup_visual" or (model and model.role == "resource")
             if not is_resource or tile.pos in self.consumed:
                 continue
-            path = self.joint_plan(scene, tile.pos, False, 70000)
+            path = self.careful_plan(scene, tile.pos, 70000)
             if path is not None:
                 options.append(path)
         return min(options, key=len) if options else None
@@ -961,15 +1113,91 @@ class LS20ExtendedStateAgent:
         return None
 
     def plan_to_test_gate(self, scene: Scene, source: Pos, crossing: GameAction) -> Optional[List[GameAction]]:
-        path = self.joint_plan(scene, source, False, 60000)
+        path = self.careful_plan(scene, source, 60000, fallback=False)
         if path is None:
             return None
         return path + [crossing]
 
+    def frontier(self, scene: Scene) -> List[Pos]:
+        """Known free cells next to cells never seen: walking there reveals more of the map."""
+        unknown = scene.grid_cells - self.seen_cells
+        if not unknown:
+            return []
+        cells = []
+        for pos in self.free_memory:
+            if any((pos[0] + dr, pos[1] + dc) in unknown for dr, dc in MOVE.values()):
+                cells.append(pos)
+        return sorted(cells, key=lambda p: abs(p[0] - scene.player[0]) + abs(p[1] - scene.player[1]))
+
+    def budget_plan(self, scene: Scene) -> Optional[Tuple[List[GameAction], str]]:
+        """The key fits an open door but the resource is too short to get there: refill first.
+
+        Only used when resource really is the blocker: a plan to the door exists with a full budget.
+        The refill target is kept (commitment) until it is reached or used up.
+        """
+        if self.required_role(scene) != "door":
+            return None
+        intent = self.reveal_intent
+        if intent is not None and intent[0] == "refill" and intent[1] != scene.player \
+                and intent[1] not in self.consumed and intent[1] in self.tiles:
+            path = self.joint_plan(scene, intent[1], False, 30000)
+            if path:
+                return path, "recharge-before-door"
+        if self.joint_plan(dataclasses.replace(scene, resource=10 ** 6)) is None:
+            return None                                   # not a budget problem
+        reserve = self.resource_plan(scene)
+        if reserve is None:
+            return None
+        self.reveal_intent = ("refill", self.plan_end(scene, reserve))
+        return reserve, "recharge-before-door"
+
+    def plan_end(self, scene: Scene, path: List[GameAction]) -> Pos:
+        pos, config = scene.player, scene.dynamic_config
+        for action in path:
+            nxt = self.transition_position(pos, action, config)
+            if nxt is None:
+                break
+            pos, config = nxt
+        return pos
+
+    def reveal_plan(self, scene: Scene) -> Optional[Tuple[List[GameAction], str]]:
+        """Go to the nearest reachable frontier cell (limited vision: discover the objective).
+
+        Commitment: once a frontier cell or a refill was chosen, keep going there until it is reached
+        or no longer useful. Re-deciding every step made the agent ping-pong between "reveal" and
+        "recharge first" (each step flips the resource check) across a shape tile.
+        """
+        intent = self.reveal_intent
+        if intent is not None:
+            kind, target = intent
+            useful = (target != scene.player and
+                      (kind == "recharge" and target not in self.consumed and target in self.tiles
+                       or kind == "reveal" and target in self.frontier(scene)))
+            path = self.careful_plan(scene, target) if useful else None
+            if path:
+                return path, "recharge-before-reveal" if kind == "recharge" else f"explore:reveal@{target}"
+            self.reveal_intent = None
+        for cell in self.frontier(scene)[:8]:
+            if cell == scene.player:
+                continue
+            path = self.careful_plan(scene, cell)
+            if path:
+                reserve = self.resource_plan(scene)
+                if scene.resource < self.step_cost * (len(path) + 4) and reserve:
+                    self.reveal_intent = ("recharge", self.plan_end(scene, reserve))
+                    return reserve, "recharge-before-reveal"
+                self.reveal_intent = ("reveal", cell)
+                return path, f"explore:reveal@{cell}"
+        return None
+
     def choose_plan(self, scene: Scene) -> Tuple[List[GameAction], str]:
         solution = self.joint_plan(scene)
         if solution:
+            self.reveal_intent = None
             return solution, "execute:temporal-state-plan"
+        budget = self.budget_plan(scene)
+        if budget is not None:
+            return budget
 
         experiment = self.semantic_experiment(scene)
         if experiment is not None:
@@ -988,6 +1216,10 @@ class LS20ExtendedStateAgent:
                 best = (score, path, f"explore:tile@{tile.pos}")
         if best:
             return best[1], best[2]
+
+        reveal = self.reveal_plan(scene)
+        if reveal is not None:
+            return reveal
 
         role = self.required_role(scene)
         for signature in self.moving_signatures:
@@ -1016,13 +1248,15 @@ class LS20ExtendedStateAgent:
         for pos in sorted(self.free_memory, key=lambda p: abs(p[0] - scene.player[0]) + abs(p[1] - scene.player[1])):
             semantic = (scene.level, pos, scene.key, scene.dynamic_config, self.level_tick % self.temporal_cycle())
             if self.seen[semantic] == 0:
-                path = self.joint_plan(scene, pos, False, 30000)
+                path = self.careful_plan(scene, pos, fallback=False)
                 if path:
                     return path, "explore:frontier"
         legal = []
         for action in MOVE:
             transition = self.transition_position(scene.player, action, scene.dynamic_config)
             if transition is not None and transition[0] in self.free_memory:
+                if self.careful_exploration and transition[0] in self.mechanism_cells():
+                    continue
                 legal.append(action)
         return ([legal[int(self.rng.integers(len(legal)))]] if legal else [GameAction.ACTION1]), "fallback"
 
@@ -1038,7 +1272,8 @@ class LS20ExtendedStateAgent:
             if restarting or previous_action not in MOVE:
                 previous = None
             delta = MOVE.get(previous_action, (0, 0))
-            self.slides = self.slide_model(previous, delta, scene)
+            fresh = self.slide_model(previous, delta, scene)
+            self.slides = {c: v for c, v in self.slides.items() if c not in scene.visible_cells} | fresh
         temporal_phase = self.level_tick % self.temporal_cycle()
         semantic = (
             scene.level, scene.player, scene.key,

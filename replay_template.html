@@ -7,7 +7,7 @@
 <style>
   :root {
     --bg: #f6f5f2; --panel: #ffffff; --ink: #1d1d1f; --muted: #6b6b70; --line: #e3e1dc;
-    --accent: #2f6fde; --level: #1f9d55; --death: #d64545; --miss: #e08a1e; --learn: #3a7bd5; --edge: #19a3a3; --slide: #c2409b; --surprise: #ff5fa2; --cnn: #8a4fd8;
+    --accent: #2f6fde; --level: #1f9d55; --death: #d64545; --miss: #e08a1e; --learn: #3a7bd5; --edge: #19a3a3; --slide: #c2409b; --goal: #12b886; --memory: #f2c94c; --surprise: #ff5fa2; --cnn: #8a4fd8;
     --path: #ffd23f; --chip: #eeece7;
   }
   @media (prefers-color-scheme: dark) {
@@ -93,7 +93,7 @@
     <select id="evFilter" title="which events the event buttons jump to">
       <option value="all">all events</option><option value="death">game overs</option>
       <option value="level">levels solved</option><option value="learn">tile rules learned</option><option value="edge">non-local moves learned</option>
-      <option value="surprise">surprise pushes</option><option value="slide">predicted pushes</option>
+      <option value="goal">objective updates</option><option value="memory">memory updates</option><option value="surprise">surprise pushes</option><option value="slide">predicted pushes</option>
       <option value="miss">CNN misses</option><option value="cnn">CNN milestones</option>
     </select>
     <select id="speed" title="playback speed">
@@ -157,7 +157,7 @@
 const DATA = /*__DATA__*/null;
 const EV = { level: ["--level", "level solved"], death: ["--death", "game over"], learn: ["--learn", "tile rule learned"],
              edge: ["--edge", "non-local move learned"], slide: ["--slide", "push predicted"],
-             surprise: ["--surprise", "surprise push (fast learning)"],
+             surprise: ["--surprise", "surprise push (fast learning)"], goal: ["--goal", "objective update"], memory: ["--memory", "memory update"],
              miss: ["--miss", "CNN miss"], cnn: ["--cnn", "CNN milestone"] };
 const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 const $ = id => document.getElementById(id);
@@ -192,7 +192,7 @@ const LS = DATA.layer_size * DATA.layer_size;
 const layerAt = (t, j) => layers.subarray((t * Math.max(1, DATA.n_layers) + j) * LS, (t * Math.max(1, DATA.n_layers) + j + 1) * LS);
 
 // ------------------------------------------------------------------ overlays
-const TOGGLES = { path: "planned path", target: "target", tiles: "learned tiles", slides: "predicted pushes", cnn: "CNN player box",
+const TOGGLES = { path: "planned path", target: "target", objectives: "objectives", memory: "map memory", tiles: "learned tiles", slides: "predicted pushes", cnn: "CNN player box",
                   oracle: "hand-made detector", motion: "motion label", grid: "grid" };
 const on = Object.fromEntries(Object.keys(TOGGLES).map(k => [k, k !== "grid"]));
 function buildToggles() {
@@ -212,6 +212,33 @@ function drawOverlay(ctx, t) {
   if (on.motion && o.motion) {
     const mm = motion.subarray(t * 4096, (t + 1) * 4096); ctx.fillStyle = "rgba(80,255,180,0.35)";
     for (let i = 0; i < 4096; i++) if (mm[i]) ctx.fillRect((i % 64) * S, Math.floor(i / 64) * S, S, S);
+  }
+  if (on.memory && (o.memory || o.frontier)) {
+    ctx.fillStyle = "rgba(160, 170, 190, 0.28)";
+    for (const [y, x] of o.memory || []) ctx.fillRect((x - 2) * S, (y - 2) * S, 5 * S, 5 * S);
+    ctx.strokeStyle = "rgba(53, 224, 255, 0.85)"; ctx.lineWidth = 2;
+    for (const [y, x] of o.frontier || []) { const [cx, cy] = P([y, x]); ctx.beginPath(); ctx.arc(cx, cy, 6, 0, 7); ctx.stroke(); }
+    for (const [y, x, kind, status] of o.remembered || []) {      // the object memory
+      const [cx, cy] = P([y, x]); ctx.lineWidth = 2.5;
+      ctx.strokeStyle = ctx.fillStyle = kind === "goal" ? css("--goal") : kind === "refill" ? css("--memory") : "#ffffff";
+      ctx.beginPath();
+      if (kind === "goal") { ctx.moveTo(cx, cy - 9); ctx.lineTo(cx + 9, cy); ctx.lineTo(cx, cy + 9); ctx.lineTo(cx - 9, cy); ctx.closePath(); }
+      else if (kind === "refill") ctx.arc(cx, cy, 7, 0, 7);
+      else ctx.rect(cx - 7, cy - 7, 14, 14);
+      status === "present" ? (ctx.globalAlpha = 0.55, ctx.fill(), ctx.globalAlpha = 1, ctx.stroke()) : ctx.stroke();
+    }
+  }
+  if (on.objectives && o.objectives) {
+    for (const [y, x, status, fails] of o.objectives) {
+      const [cx, cy] = P([y, x]);
+      ctx.lineWidth = 3; ctx.strokeStyle = status === "open" ? css("--goal") : "rgba(255,255,255,0.75)";
+      ctx.setLineDash(status === "open" ? [] : [4, 4]); ctx.strokeRect(cx - 34, cy - 34, 68, 68); ctx.setLineDash([]);
+      ctx.font = "700 11px ui-sans-serif, system-ui"; ctx.textAlign = "center";
+      const label = status === "open" ? (fails ? `open · no effect ${fails}x` : "open goal") : "✓ achieved";
+      const w = ctx.measureText(label).width + 8;
+      ctx.fillStyle = status === "open" ? css("--goal") : "rgba(20,20,24,0.85)";
+      ctx.fillRect(cx - w / 2, cy + 36, w, 15); ctx.fillStyle = "#fff"; ctx.fillText(label, cx, cy + 47);
+    }
   }
   if (on.tiles && o.tiles) {
     ctx.font = "600 11px ui-sans-serif, system-ui"; ctx.textAlign = "center";
