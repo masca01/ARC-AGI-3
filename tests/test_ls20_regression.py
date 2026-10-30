@@ -121,6 +121,22 @@ def test_full_game_won_with_limited_vision_level_7():
     assert sum(agent.level_actions[:7]) <= 480, agent.level_actions
 
 
+def test_click_game_falls_back_to_the_general_explorer():
+    """A game without arrow keys (ft09) must not crash: the agent hands over to the CNN explorer."""
+    import arc_agi
+    from dotenv import load_dotenv
+
+    load_dotenv(ROOT / ".env")
+    logging.disable(logging.CRITICAL)
+    env = arc_agi.Arcade().make("ft09", include_frame_data=True)
+    agent_cls = type("TestAgent", (CausalAgent,), {"PERCEPTION": "neural", "SLIDES": True, "MAX_ACTIONS": 30})
+    agent = agent_cls(card_id="local", game_id="ft09", agent_name="test", ROOT_URL="http://localhost",
+                      record=False, arc_env=env)
+    agent.main()
+    assert agent.fallback == "the game has no arrow keys"
+    assert agent.action_counter > 30
+
+
 def test_object_memory_keeps_used_refills_for_the_next_attempt():
     from agent.memory import ObjectMemory
 

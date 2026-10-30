@@ -217,6 +217,33 @@ Returns to the cell just left: level 4 from 41 to 7, level 7 from 49 to 24. The 
 deliberate (stepping off a tile and back on to use it again). Level 7 is now below the human baseline
 (186).
 
+### Other games: held-out test and fallback
+
+With no changes, the ls20 agent solved 0 levels on the other 6 games. ft09, r11l, sb26 and su15 have no
+arrow keys, so the warm-up move list was empty and the agent crashed at the first step. On bp35 and m0r0
+the self-supervised CNN did learn what the agent controls: a 5x5 object on a **6 px** grid in bp35, and a
+5x25 object on a 5 px grid in m0r0. But the ls20 parser found no ls20-style key, so the planner never ran.
+
+`CausalAgent` now falls back, for the rest of the game, to the general CNN explorer (`MyAgent`, which uses
+every action including clicks) when the game has no arrow keys, when the ls20 parser fails 10 steps in a
+row although the player was found, or after 40 warm-up moves in a row without a controllable object.
+On ls20 none of these happens (all tests pass).
+
+300 actions per game, one run:
+
+| Game | Switched | Levels: causal + fallback | Levels: `cnn` alone |
+|---|---|---|---|
+| ft09 | step 0, no arrow keys | 0 / 6 | 0 / 6 |
+| r11l | step 0, no arrow keys | 1 / 6 | 1 / 6 |
+| sb26 | step 0, no arrow keys | 0 / 8 | 0 / 8 |
+| bp35 | step 29, parser keeps failing | 0 / 9 | 0 / 9 |
+| m0r0 | step 23, parser keeps failing | 0 / 6 | 0 / 6 |
+| su15 | step 0, no arrow keys | 0 / 9 | 0 / 9 |
+
+So the fallback removes the crashes and makes the agent as good as the general explorer on these games
+(1 level in total), but no better. The knowledge that made ls20 work (causal tile roles, slides, objectives,
+memory, plans) is not used there yet, because it reaches the planner only through the ls20 parser.
+
 ### Results on ls20 (deterministic, one run)
 
 | Agent | Levels | Actions on levels 1 / 2 / 3 / 4 | CNN finds the player's cell |
@@ -336,6 +363,10 @@ Comparison on the same 6 games and budget (one run each, so a difference of one 
 - The causal agent only works on `ls20`: everything except the player detector still assumes ls20's colours, 5 px grid and HUD layout, and it never clicks.
 
 ## Changelog
+
+### 2026-10-29 - fallback to the general explorer on non-ls20 games
+- `CausalAgent` hands over to `MyAgent` (CNN explorer) when the game has no arrow keys, the ls20 parser keeps failing, or no controllable object is found. Fixes the crash on click games. The replay shows a "switched to general explorer" event.
+- Held-out result (300 actions each): 1 level in total over ft09, r11l, sb26, bp35, m0r0, su15 (r11l), the same as `cnn` alone. ls20 unchanged.
 
 ### 2026-10-29 - plan commitment: no back-and-forth
 - The planner keeps executing its plan while each step turns out as predicted and nothing new was learned, and replans otherwise (`commit_plans`, `CausalAgent.COMMIT`).

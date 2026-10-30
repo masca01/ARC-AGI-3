@@ -157,7 +157,7 @@
 const DATA = /*__DATA__*/null;
 const EV = { level: ["--level", "level solved"], death: ["--death", "game over"], learn: ["--learn", "tile rule learned"],
              edge: ["--edge", "non-local move learned"], slide: ["--slide", "push predicted"],
-             surprise: ["--surprise", "surprise push (fast learning)"], goal: ["--goal", "objective update"], memory: ["--memory", "memory update"],
+             surprise: ["--surprise", "surprise push (fast learning)"], goal: ["--goal", "objective update"], fallback: ["--death", "switched to general explorer"], memory: ["--memory", "memory update"],
              miss: ["--miss", "CNN miss"], cnn: ["--cnn", "CNN milestone"] };
 const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 const $ = id => document.getElementById(id);

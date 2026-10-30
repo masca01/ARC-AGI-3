@@ -13,6 +13,11 @@ Everything else (keys, doors, tiles, gates, HUD reading, planning) is the teamma
 ls20_specialist.py. After a GAME_OVER the agent RESETs and retries the same level, keeping what it
 learned about it.
 
+Fallback: the planner only understands games that look like ls20. When it cannot work (the game has no
+arrow keys, the ls20 parser keeps failing although the player was found, or no controllable object
+shows up), the agent switches for the rest of the game to the general CNN explorer (MyAgent in
+my_agent.py), which uses every action including clicks.
+
 Contract (same as the official framework and Kaggle):
   class CausalAgent(Agent) with is_done(frames, latest_frame) and choose_action(frames, latest_frame)
 """
@@ -34,6 +39,7 @@ from .ls20_specialist import LS20ExtendedStateAgent
 from .slide_net import NAMES as SLIDE_NAMES
 from .slide_net import SlideLearner
 from .model import to_array
+from .my_agent import MyAgent
 
 
 ROLE_LABELS = {"rotate_cw": "rot+90", "rotate_ccw": "rot-90", "rotate_180": "rot180", "recolor": "colour",
@@ -48,6 +54,8 @@ class CausalAgent(Agent):
     OBJECTIVES = True            # track which goals are still open (several doors per level)
     MEMORY = True                # remember objectives, tiles and refills (including used ones)
     COMMIT = True                # keep executing a plan while it turns out as predicted
+    FALLBACK_PARSE_FAILURES = 10 # steps in a row the ls20 parser fails although the player was found
+    FALLBACK_WARMUP = 40         # warm-up moves in a row without finding a controllable object
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
@@ -70,6 +78,10 @@ class CausalAgent(Agent):
         self.oracle_hits: list[list[int]] = [[]] # per level: 1 if the CNN found the player's cell
         self.trace: list[dict] = []
         self.last_choice: dict[str, Any] = {}
+        self.fallback: str | None = None         # why the general explorer took over, if it did
+        self.explorer: MyAgent | None = None
+        self.parse_failures = 0
+        self.warmup_streak = 0
 
     # ----------------------------------------------------------------- contract
     def is_done(self, frames: list[FrameData], latest_frame: FrameData) -> bool:
@@ -81,6 +93,12 @@ class CausalAgent(Agent):
         while len(self.level_actions) <= level:
             self.level_actions.append(0)
             self.oracle_hits.append([])
+        if self.fallback is not None:
+            return self._explore(frames, latest_frame, frame, level)
+        if latest_frame.state is not GameState.NOT_PLAYED and latest_frame.available_actions \
+                and not any(a in latest_frame.available_actions for a in MOVE_IDS):
+            self._start_fallback("the game has no arrow keys")
+            return self._explore(frames, latest_frame, frame, level)
 
         if latest_frame.state in (GameState.NOT_PLAYED, GameState.GAME_OVER):
             events = []
@@ -113,7 +131,17 @@ class CausalAgent(Agent):
         try:
             action = self.planner.next_action(latest_frame)
             why = self.planner.reason
+            self.parse_failures = self.warmup_streak = 0
         except RuntimeError as err:
+            player_found = "player" not in str(err)
+            self.parse_failures = self.parse_failures + 1 if player_found else 0
+            self.warmup_streak = 0 if player_found else self.warmup_streak + 1
+            if self.parse_failures >= self.FALLBACK_PARSE_FAILURES:
+                self._start_fallback(f"the ls20 parser keeps failing ({err})")
+                return self._explore(frames, latest_frame, frame, level)
+            if self.warmup_streak >= self.FALLBACK_WARMUP:
+                self._start_fallback("no controllable object found")
+                return self._explore(frames, latest_frame, frame, level)
             # the player could not be found: the CNN is not trained yet (or lost it). Move to
             # collect motion labels; the planner must not learn from a move it did not choose.
             self.planner.last_scene = self.planner.last_action = None
@@ -156,6 +184,39 @@ class CausalAgent(Agent):
         elif event is not None and event.fast:
             self.slide_events.append(("surprise", f"false alarm at {event.cell}: no push (fast learning)"))
         return self.slides.table(scene)
+
+    # ----------------------------------------------------------------- fallback
+    def _start_fallback(self, reason: str) -> None:
+        self.fallback = reason
+        self.explorer = MyAgent(card_id=self.card_id, game_id=self.game_id, agent_name=f"{self.agent_name}.explorer",
+                                ROOT_URL=self.ROOT_URL, record=False, arc_env=self.arc_env)
+        self._fallback_event = ("fallback", f"switching to the general CNN explorer: {reason}")
+
+    def _explore(self, frames, latest_frame: FrameData, frame: np.ndarray, level: int) -> GameAction:
+        """One step of the general explorer, with the same bookkeeping and replay data as the planner."""
+        n_trace = len(self.explorer.trace)
+        if latest_frame.state is GameState.GAME_OVER:
+            self.attempts += 1
+        action = self.explorer.choose_action(frames, latest_frame)
+        self.explorer.action_counter += 1
+        events = [self._fallback_event] if getattr(self, "_fallback_event", None) else []
+        self._fallback_event = None
+        if self.trace and level > self.trace[-1]["level"]:
+            events.append(("level", f"level {level} solved in {self.level_actions[level - 1]} actions"))
+        if len(self.explorer.trace) > n_trace:
+            step = dict(self.explorer.trace[-1])
+        else:                                          # RESET: the explorer records nothing
+            step = dict(frame=frame, action=action.value, x=-1, y=-1, p=None, level=level,
+                        heat=np.zeros(frame.shape), heat_title="CNN explorer")
+            step["why"] = "start of game or game over"
+        if action is not GameAction.RESET:
+            self.level_actions[level] += 1
+        step.update(why=f"explorer: {step.get('why', '')}", level=level, attempt=self.attempts, events=events,
+                    info={"strategy": f"general CNN explorer ({self.fallback})"})
+        self.trace.append(step)
+        self.last_choice = {"action": self.explorer.last_choice.get("action", action.name),
+                            "why": f"explorer: {self.explorer.last_choice.get('why', '')}"}
+        return action
 
     # ------------------------------------------------------------------ replays
     def _record(self, frame, action: GameAction, why: str, level: int, events: list, motion, oracle,
@@ -262,4 +323,5 @@ class CausalAgent(Agent):
             "models": {k: v.role for k, v in self.planner.models.items()},
             "slides": self.slides.stats() if self.slides is not None else None,
             "plan reuses": self.planner.plan_reuses,
+            "fallback": self.fallback,
         }
