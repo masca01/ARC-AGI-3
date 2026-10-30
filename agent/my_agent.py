@@ -64,6 +64,7 @@ class MyAgent(Agent):
         simple = [a for a in SIMPLE_IDS if a in available]
         can_click = CLICK_ID in available
         heat, heat_title, p, p_static = np.zeros((GRID, GRID)), "network not trained yet", None, None
+        probs, maps = None, None   # for replays: the CNN's outputs at this step
 
         if self.action_counter < self.WARMUP_STEPS or not self.brain.ready or random.random() < self.EPSILON:
             # step 1: random try (always during warm-up, then EPSILON of the time)
@@ -98,10 +99,17 @@ class MyAgent(Agent):
                 heat, heat_title = click_map / max(1e-6, float(click_map.max())), "CNN: where clicking looks useful"
             else:
                 heat, heat_title = out["static"], "CNN: pixels that change anyway (counters)"
+            probs = [(f"ACTION{a}", float(out["change_simple"][SIMPLE_INDEX[a]]), float(out["win_simple"][SIMPLE_INDEX[a]]))
+                     for a in simple]
+            if can_click:
+                probs.append(("click (best px)", float(out["change_click"].max()), float(out["win_click"].max())))
+            maps = [("CNN: P(change) per click pixel", out["change_click"]), ("CNN: P(win) per click pixel", out["win_click"]),
+                    ("CNN: pixels that change anyway", out["static"])]
 
         self.prev = (frame, action, x, y, latest_frame.levels_completed, p, p_static)
         self.trace.append(dict(frame=frame, action=action, x=x, y=y, p=p, why=why,
-                               level=latest_frame.levels_completed, heat=heat, heat_title=heat_title))
+                               level=latest_frame.levels_completed, heat=heat, heat_title=heat_title,
+                               probs=probs, maps=maps, stats={"P(change)": p} if p is not None else {}))
         name = f"ACTION6@({x},{y})" if action == CLICK_ID else f"ACTION{action}"
         self.last_choice = {"action": name, "p": p, "why": why}
 

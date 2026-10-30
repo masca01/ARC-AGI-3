@@ -5,7 +5,10 @@ Ported unchanged except for:
   - `locate_player` lets another module (the CNN in control_net.py) replace the hand-made
     player detector; None keeps the original colour-12 detector,
   - `restart_attempt()` tells the agent the environment was RESET after a GAME_OVER, so the
-    same level is retried while keeping everything learned about it.
+    same level is retried while keeping everything learned about it,
+  - `slide_model` (SlideNet in slide_net.py) predicts pushes from how cells look. Planning uses
+    those predictions wherever no exact observation exists, and confidently predicted pushers are
+    not re-tested. None keeps the original behaviour.
 """
 from __future__ import annotations
 
@@ -233,6 +236,8 @@ class LS20ExtendedStateAgent:
         self.models: Dict[str, TileModel] = {}
         # frame -> (grid position, grid origin) or None; None means "use detect_player"
         self.locate_player: Optional[Callable[[np.ndarray], Optional[Tuple[Pos, Pos]]]] = None
+        # (previous scene, previous action, scene) -> {cell: (class, probability, slide end)}; None = off
+        self.slide_model: Optional[Callable] = None
         self.reset_episode()
 
     def reset_episode(self) -> None:
@@ -261,6 +266,8 @@ class LS20ExtendedStateAgent:
         self.resource_capacity = 42
         self.step_cost = 1
         self.pending_restart = False
+        self.last_plan: List[GameAction] = []   # whole plan behind the last action, for replays
+        self.slides: Dict[Pos, Tuple[int, float, Optional[Pos]]] = {}
 
     def restart_attempt(self) -> None:
         """The environment was RESET after a GAME_OVER: the next frame restarts the same level."""
@@ -679,6 +686,9 @@ class LS20ExtendedStateAgent:
         if tile is not None and (contacted or resource_gain):
             self.learn_tile(tile, previous.key, scene.key, previous.resource, scene.resource)
 
+    SLIDE_CONFIDENCE = 0.5     # use a predicted push in planning above this probability
+    SLIDE_SURE = 0.9           # do not re-test a crossing whose outcome is predicted this surely
+
     def transition_position(self, pos: Pos, action: GameAction,
                             config: DynamicConfig) -> Optional[Tuple[Pos, DynamicConfig]]:
         known = self.dynamic_edges.get((pos, action.value, config))
@@ -687,6 +697,9 @@ class LS20ExtendedStateAgent:
         nxt = self.attempted_destination(pos, action)
         if (pos, nxt) in self.blocked_edges:
             return None
+        slide = self.slides.get(nxt)
+        if slide is not None and slide[0] and slide[1] >= self.SLIDE_CONFIDENCE and slide[2] is not None:
+            return slide[2], config
         return nxt, config
 
     def apply_tile(self, pos: Pos, key: Key, resource: int, mask: int,
@@ -933,6 +946,8 @@ class LS20ExtendedStateAgent:
                 if action is None or source not in self.free_memory:
                     continue
                 learned_here = any(k[0] == source and k[1] == action.value for k in self.dynamic_edges)
+                predicted = self.slides.get(self.attempted_destination(source, action))
+                learned_here |= predicted is not None and predicted[1] >= self.SLIDE_SURE
                 if not learned_here and (source, self.attempted_destination(source, action)) not in self.blocked_edges:
                     candidates.append((source, action))
         return candidates
@@ -1015,8 +1030,15 @@ class LS20ExtendedStateAgent:
         scene = self.parse(obs)
         if scene.level != self.level:
             self.begin_level(scene)
+        previous, previous_action = self.last_scene, self.last_action
+        restarting = self.pending_restart
         self.merge_scene(scene)
         self.observe_transition(scene)
+        if self.slide_model is not None:
+            if restarting or previous_action not in MOVE:
+                previous = None
+            delta = MOVE.get(previous_action, (0, 0))
+            self.slides = self.slide_model(previous, delta, scene)
         temporal_phase = self.level_tick % self.temporal_cycle()
         semantic = (
             scene.level, scene.player, scene.key,
@@ -1026,6 +1048,7 @@ class LS20ExtendedStateAgent:
         if self.seen[semantic] > 1:
             self.semantic_repeats += 1
         plan, self.reason = self.choose_plan(scene)
+        self.last_plan = list(plan)
         action = plan[0] if plan else GameAction.ACTION1
         if self.verbose and self.reason != self.last_reason:
             periods = {

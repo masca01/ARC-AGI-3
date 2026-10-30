@@ -7,6 +7,7 @@
     python3 run_local.py --game ls20 --render human --steps 60   # live window (slow)
     python3 run_local.py --game ls20 --agent causal --steps 1000          # teammate's causal planner
     python3 run_local.py --game ls20 --agent causal-neural --steps 1000   # same, CNN finds the player
+    python3 run_local.py --game ls20 --agent causal-neural --html         # interactive replay in outputs/
 
 Needs ARC_API_KEY in .env. Games download once and are cached in environment_files/.
 """
@@ -25,6 +26,7 @@ from arc_agi.rendering import COLOR_MAP, hex_to_rgb
 
 from agent.causal_agent import CausalAgent
 from agent.my_agent import MyAgent
+from replay import save_html
 
 ROOT = Path(__file__).resolve().parent
 OUT = ROOT / "outputs"
@@ -39,6 +41,7 @@ AGENTS = {
     "cnn": MyAgent,
     "causal": type("CausalHeuristic", (CausalAgent,), {"PERCEPTION": "heuristic"}),
     "causal-neural": type("CausalNeural", (CausalAgent,), {"PERCEPTION": "neural", "ORACLE": True}),
+    "causal-slides": type("CausalSlides", (CausalAgent,), {"PERCEPTION": "neural", "ORACLE": True, "SLIDES": True}),
 }
 
 
@@ -115,6 +118,28 @@ def save_gif(agent, game_id: str, scale: int = 6, ms: int = 120) -> None:
     print(f"  saved {path.relative_to(ROOT)} ({len(images)} frames)")
 
 
+def save_replay(r: dict, agent_name: str) -> None:
+    """Interactive HTML replay: scrub through the game and see what the agent saw and believed."""
+    agent, summary = r["agent"], {"agent": agent_name, "levels": f"{r['levels']}/{r['win_levels']}",
+                                  "actions": r["actions"], "final state": r["state"]}
+    if isinstance(agent, CausalAgent):
+        summary.update({"attempts": r["attempts"], "actions per level": r["level_actions"]})
+        if r.get("slides"):
+            summary["pushes predicted"] = (f"{r['slides']['pushes predicted before they happened']}"
+                                           f"/{r['slides']['pushes seen']}")
+        if r.get("player_acc") is not None:
+            summary["CNN player accuracy"] = f"{100 * r['player_acc']:.1f}%"
+        p, scene = agent.perception, agent.planner.last_scene
+        if p is not None and p.step:
+            summary["grid"] = [p.step, *p.origin]
+        elif scene is not None:
+            summary["grid"] = [5, *scene.origin]
+    elif r.get("level_steps"):
+        summary["level solved at step"] = r["level_steps"]
+    path = save_html(agent, r["game"], OUT / f"{r['game']}_{agent_name}_replay.html", summary)
+    print(f"  saved {path.relative_to(ROOT)} ({path.stat().st_size / 1e6:.1f} MB) - open it in a browser")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--game", default="ls20", help="game id, or several separated by commas")
@@ -122,6 +147,7 @@ def main() -> None:
     ap.add_argument("--list", action="store_true", help="list the public games and exit")
     ap.add_argument("--steps", type=int, default=300, help="max actions per game")
     ap.add_argument("--gif", action="store_true", help="save a replay GIF per game in outputs/")
+    ap.add_argument("--html", action="store_true", help="save an interactive HTML replay per game in outputs/")
     ap.add_argument("--render", default=None, choices=["human", "terminal"], help="watch live (slow)")
     ap.add_argument("--log-every", type=int, default=25)
     ap.add_argument("--agent", default="cnn", choices=list(AGENTS), help="which agent plays")
@@ -145,6 +171,8 @@ def main() -> None:
             results.append(r)
             if args.gif:
                 save_gif(r["agent"], g)
+            if args.html:
+                save_replay(r, args.agent)
 
     if args.agent != "cnn":
         print("\n======================== SUMMARY ========================")

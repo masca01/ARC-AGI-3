@@ -54,6 +54,37 @@ def test_neural_perception_matches_hand_made_detector():
     assert stats["player_acc"] == 1.0, stats["player_acc_by_level"]
 
 
+def test_slide_net_learns_pushes_and_solves_level_5():
+    """SlideNet: levels 1-3 as before, level 5 solved, most pushes predicted before they happen."""
+    import arc_agi
+    from dotenv import load_dotenv
+
+    load_dotenv(ROOT / ".env")
+    logging.disable(logging.CRITICAL)
+    env = arc_agi.Arcade().make("ls20", include_frame_data=True)
+    agent_cls = type("TestAgent", (CausalAgent,), {"PERCEPTION": "neural", "SLIDES": True, "MAX_ACTIONS": 340})
+    agent = agent_cls(card_id="local", game_id="ls20", agent_name="test", ROOT_URL="http://localhost",
+                      record=False, arc_env=env)
+    agent.main()
+    slides = agent.stats()["slides"]
+    assert agent.frames[-1].levels_completed >= 5, agent.level_actions
+    assert agent.level_actions[1:3] == ORIGINAL_LEVEL_ACTIONS[1:3], agent.level_actions
+    assert slides["false alarms"] == 0, slides
+    assert slides["pushes predicted before they happened"] >= 0.75 * slides["pushes seen"], slides
+
+
+def test_slide_augmentation_rotates_direction_with_the_icon():
+    from agent.slide_net import NAMES, SIZE, augment
+
+    x = np.zeros((17, SIZE, SIZE), np.float32)
+    x[1, 7, 0] = 1                                   # icon on the left edge pushes right
+    away = {"left": "right", "right": "left", "up": "down", "down": "up"}
+    for img, label in augment(x, NAMES.index("right")):
+        y, xx = map(int, np.argwhere(img[1])[0])
+        side = "left" if xx == 0 else "right" if xx == SIZE - 1 else "up" if y == 0 else "down"
+        assert NAMES[label] == away[side], (side, NAMES[label])
+
+
 def test_rotation_classification_unchanged():
     key = (9, 9, 9, 9, BG, BG, 9, BG, 9)
     rotated = tuple(map(int, np.rot90(np.asarray(key).reshape(3, 3), -1).ravel()))

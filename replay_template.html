@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ARC Replay</title>
+<style>
+  :root {
+    --bg: #f6f5f2; --panel: #ffffff; --ink: #1d1d1f; --muted: #6b6b70; --line: #e3e1dc;
+    --accent: #2f6fde; --level: #1f9d55; --death: #d64545; --miss: #e08a1e; --learn: #3a7bd5; --edge: #19a3a3; --slide: #c2409b; --surprise: #ff5fa2; --cnn: #8a4fd8;
+    --path: #ffd23f; --chip: #eeece7;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #141416; --panel: #1d1d21; --ink: #ececee; --muted: #9a9aa2; --line: #2e2e34;
+            --accent: #6d9cff; --chip: #26262b; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif; }
+  header { padding: 14px 20px 10px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px 18px; }
+  h1 { font-size: 18px; margin: 0; font-weight: 650; letter-spacing: -0.01em; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { background: var(--chip); border-radius: 999px; padding: 2px 10px; color: var(--muted); }
+  .chip b { color: var(--ink); font-weight: 600; }
+  .bar { position: sticky; top: 0; z-index: 5; background: var(--bg); padding: 6px 20px 8px; border-bottom: 1px solid var(--line); }
+  .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  button, select { font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--line);
+                   border-radius: 7px; padding: 4px 9px; cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); color: #fff; border-color: var(--accent); min-width: 64px; }
+  input[type=range] { flex: 1; min-width: 160px; accent-color: var(--accent); }
+  .stepno { font-variant-numeric: tabular-nums; min-width: 110px; text-align: right; color: var(--muted); }
+  canvas.timeline { width: 100%; height: 34px; display: block; margin-top: 6px; cursor: pointer; border-radius: 6px; }
+  canvas.spark { width: 100%; height: 54px; display: block; margin-top: 2px; cursor: pointer; }
+  .legend { display: flex; flex-wrap: wrap; gap: 12px; color: var(--muted); font-size: 12px; margin-top: 3px; }
+  .legend i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
+  main { display: grid; grid-template-columns: minmax(300px, 520px) minmax(280px, 1fr) minmax(280px, 380px);
+         gap: 14px; padding: 14px 20px 40px; align-items: start; }
+  @media (max-width: 1180px) { main { grid-template-columns: minmax(300px, 520px) 1fr; } .side { grid-column: 1 / -1; } }
+  @media (max-width: 760px) { main { grid-template-columns: 1fr; padding: 12px 16px; } header, .bar { padding-left: 16px; padding-right: 16px; } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+  .card h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 0 0 8px; font-weight: 600; }
+  .game canvas { width: 100%; aspect-ratio: 1; image-rendering: pixelated; display: block; border-radius: 6px; background: #000; }
+  .toggles { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 8px; color: var(--muted); }
+  .toggles label { cursor: pointer; white-space: nowrap; }
+  .hover { margin-top: 6px; min-height: 36px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .maps { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+  .map canvas { width: 100%; aspect-ratio: 1; image-rendering: pixelated; display: block; border-radius: 6px; background: #000; }
+  .map .t { font-size: 12px; margin-bottom: 3px; }
+  .net { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 6px; padding-bottom: 4px; }
+  .net .layer { flex: 0 0 auto; text-align: center; }
+  .net canvas { width: 70px; height: 70px; image-rendering: pixelated; border-radius: 4px; display: block; background: #000; }
+  .net .lt { font-size: 11px; color: var(--muted); margin-top: 3px; max-width: 84px; }
+  .net .arrow { color: var(--muted); flex: 0 0 auto; }
+  .colorbar { height: 8px; border-radius: 4px; margin: 6px 0 2px;
+              background: linear-gradient(90deg, #000004, #3b0f70, #8c2981, #de4968, #fe9f6d, #fcfdbf); }
+  .cbl { display: flex; justify-content: space-between; color: var(--muted); font-size: 11px; }
+  .action { font-size: 20px; font-weight: 650; letter-spacing: -0.01em; }
+  .why { color: var(--muted); margin-top: 2px; word-break: break-word; }
+  .events { list-style: none; padding: 0; margin: 8px 0 0; }
+  .events li { padding: 4px 8px; border-radius: 6px; margin-bottom: 4px; background: var(--chip); }
+  .events li::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; background: var(--c); }
+  table { width: 100%; border-collapse: collapse; }
+  td { padding: 3px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+  td:first-child { color: var(--muted); width: 46%; padding-right: 8px; }
+  td:last-child { font-variant-numeric: tabular-nums; word-break: break-word; }
+  .keys { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .keys canvas { width: 54px; height: 54px; image-rendering: pixelated; border-radius: 4px; border: 1px solid var(--line); }
+  .keys .k { text-align: center; font-size: 11px; color: var(--muted); }
+  .match { font-weight: 600; }
+  .probs .row { display: grid; grid-template-columns: 100px 1fr 44px; gap: 6px; align-items: center; margin-bottom: 4px; font-size: 12px; }
+  .probs .track { height: 10px; background: var(--chip); border-radius: 5px; position: relative; overflow: hidden; }
+  .probs .fill { position: absolute; inset: 0 auto 0 0; border-radius: 5px; }
+  .probs .row.chosen .name { font-weight: 700; color: var(--accent); }
+  .stack > * + * { margin-top: 14px; }
+  .note { color: var(--muted); font-size: 12px; }
+  kbd { font: 11px ui-monospace, monospace; background: var(--chip); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title">Replay</h1>
+  <div class="chips" id="summary"></div>
+</header>
+<div class="bar">
+  <div class="controls">
+    <button id="first" title="first step (Home)">⏮</button>
+    <button id="prevEv" title="previous event (P)">◀ event</button>
+    <button id="prev" title="previous step (←)">◀</button>
+    <button id="play" class="primary" title="play / pause (space)">▶ play</button>
+    <button id="next" title="next step (→)">▶</button>
+    <button id="nextEv" title="next event (N)">event ▶</button>
+    <select id="evFilter" title="which events the event buttons jump to">
+      <option value="all">all events</option><option value="death">game overs</option>
+      <option value="level">levels solved</option><option value="learn">tile rules learned</option><option value="edge">non-local moves learned</option>
+      <option value="surprise">surprise pushes</option><option value="slide">predicted pushes</option>
+      <option value="miss">CNN misses</option><option value="cnn">CNN milestones</option>
+    </select>
+    <select id="speed" title="playback speed">
+      <option value="400">2.5 steps/s</option><option value="150" selected>7 steps/s</option>
+      <option value="60">16 steps/s</option><option value="15">60 steps/s</option>
+    </select>
+    <input type="range" id="slider" min="0" value="0">
+    <span class="stepno" id="stepno"></span>
+  </div>
+  <canvas class="timeline" id="timeline"></canvas>
+  <canvas class="spark" id="spark"></canvas>
+  <div class="legend" id="legend"></div>
+</div>
+<main>
+  <div class="stack">
+    <div class="card game">
+      <h2>Game (what the agent sees)</h2>
+      <canvas id="game" width="512" height="512"></canvas>
+      <div class="toggles" id="toggles"></div>
+      <div class="hover" id="hover">Hover the game to read every CNN output at that pixel.</div>
+    </div>
+  </div>
+  <div class="stack">
+    <div class="card" id="mapsCard">
+      <h2>Network outputs (probability per pixel)</h2>
+      <div class="maps" id="maps"></div>
+      <div class="colorbar"></div><div class="cbl"><span>0</span><span>0.5</span><span>1</span></div>
+    </div>
+    <div class="card" id="netCard">
+      <h2>Inside the CNN at this step</h2>
+      <div class="net" id="net"></div>
+      <p class="note">Each layer shows its mean activation over 32 channels. Deeper layers see wider context
+        (receptive field in px). The two output maps are on the right.</p>
+    </div>
+    <div class="card" id="probsCard">
+      <h2>Action probabilities</h2>
+      <div class="probs" id="probs"></div>
+      <p class="note"><span style="color:var(--accent)">■</span> P(change: leads somewhere new) &nbsp;
+        <span style="color:var(--level)">■</span> P(win: moves like this solved a level)</p>
+    </div>
+  </div>
+  <div class="stack side">
+    <div class="card">
+      <h2>Decision</h2>
+      <div class="action" id="action"></div>
+      <div class="why" id="why"></div>
+      <ul class="events" id="events"></ul>
+    </div>
+    <div class="card" id="keyCard">
+      <h2>Carried key vs door goal</h2>
+      <div class="keys" id="keys"></div>
+    </div>
+    <div class="card">
+      <h2>State</h2>
+      <table id="info"></table>
+    </div>
+    <p class="note">Keys: <kbd>←</kbd><kbd>→</kbd> step · <kbd>space</kbd> play · <kbd>N</kbd>/<kbd>P</kbd> next/previous event · <kbd>Home</kbd>/<kbd>End</kbd></p>
+  </div>
+</main>
+<script>
+const DATA = /*__DATA__*/null;
+const EV = { level: ["--level", "level solved"], death: ["--death", "game over"], learn: ["--learn", "tile rule learned"],
+             edge: ["--edge", "non-local move learned"], slide: ["--slide", "push predicted"],
+             surprise: ["--surprise", "surprise push (fast learning)"],
+             miss: ["--miss", "CNN miss"], cnn: ["--cnn", "CNN milestone"] };
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const $ = id => document.getElementById(id);
+const S = 8;   // game canvas pixels per frame pixel
+let frames, maps, layers, motion, cur = 0, timer = null, hoverPx = null;
+
+async function inflate(b64) {
+  const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate"));
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+const PAL = DATA.palette.map(h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)]);
+const MAGMA = [[0,0,4],[59,15,112],[140,41,129],[222,73,104],[254,159,109],[252,253,191]];
+function magma(v) {
+  const x = Math.min(1, Math.max(0, v)) * (MAGMA.length - 1), i = Math.min(MAGMA.length - 2, Math.floor(x)), f = x - i;
+  return MAGMA[i].map((c, k) => Math.round(c + (MAGMA[i + 1][k] - c) * f));
+}
+const MAGMA_LUT = Array.from({ length: 256 }, (_, i) => magma(i / 255));
+
+function paint(canvas, w, h, pixel) {           // draw a w x h image, pixel(i) -> [r,g,b]
+  const off = document.createElement("canvas"); off.width = w; off.height = h;
+  const ctx = off.getContext("2d"), img = ctx.createImageData(w, h);
+  for (let i = 0; i < w * h; i++) { const [r, g, b] = pixel(i); img.data.set([r, g, b, 255], 4 * i); }
+  ctx.putImageData(img, 0, 0);
+  const c = canvas.getContext("2d"); c.imageSmoothingEnabled = false;
+  c.drawImage(off, 0, 0, canvas.width, canvas.height);
+  return c;
+}
+const frameAt = t => frames.subarray(t * 4096, (t + 1) * 4096);
+const mapAt = (t, j) => maps.subarray((t * DATA.n_maps + j) * 4096, (t * DATA.n_maps + j + 1) * 4096);
+const LS = DATA.layer_size * DATA.layer_size;
+const layerAt = (t, j) => layers.subarray((t * Math.max(1, DATA.n_layers) + j) * LS, (t * Math.max(1, DATA.n_layers) + j + 1) * LS);
+
+// ------------------------------------------------------------------ overlays
+const TOGGLES = { path: "planned path", target: "target", tiles: "learned tiles", slides: "predicted pushes", cnn: "CNN player box",
+                  oracle: "hand-made detector", motion: "motion label", grid: "grid" };
+const on = Object.fromEntries(Object.keys(TOGGLES).map(k => [k, k !== "grid"]));
+function buildToggles() {
+  $("toggles").innerHTML = Object.entries(TOGGLES).map(([k, t]) =>
+    `<label><input type="checkbox" data-k="${k}" ${on[k] ? "checked" : ""}> ${t}</label>`).join("");
+  $("toggles").querySelectorAll("input").forEach(el => el.onchange = () => { on[el.dataset.k] = el.checked; render(); });
+}
+function drawOverlay(ctx, t) {
+  const m = DATA.meta[t], o = m.overlay || {};
+  const P = ([y, x]) => [x * S + S / 2, y * S + S / 2];
+  ctx.lineCap = ctx.lineJoin = "round";
+  if (on.grid && DATA.summary.grid) {
+    const [step, oy, ox] = DATA.summary.grid; ctx.strokeStyle = "rgba(255,255,255,0.12)"; ctx.lineWidth = 1;
+    for (let v = oy; v <= 64; v += step) { ctx.beginPath(); ctx.moveTo(0, v * S); ctx.lineTo(512, v * S); ctx.stroke(); }
+    for (let v = ox; v <= 64; v += step) { ctx.beginPath(); ctx.moveTo(v * S, 0); ctx.lineTo(v * S, 512); ctx.stroke(); }
+  }
+  if (on.motion && o.motion) {
+    const mm = motion.subarray(t * 4096, (t + 1) * 4096); ctx.fillStyle = "rgba(80,255,180,0.35)";
+    for (let i = 0; i < 4096; i++) if (mm[i]) ctx.fillRect((i % 64) * S, Math.floor(i / 64) * S, S, S);
+  }
+  if (on.tiles && o.tiles) {
+    ctx.font = "600 11px ui-sans-serif, system-ui"; ctx.textAlign = "center";
+    for (const [y, x, label] of o.tiles) {
+      const [cx, cy] = P([y, x]); const w = ctx.measureText(label).width + 8;
+      ctx.fillStyle = label === "?" ? "rgba(224,138,30,0.92)" : "rgba(20,20,24,0.85)";
+      ctx.fillRect(cx - w / 2, cy - 26, w, 15); ctx.fillStyle = "#fff"; ctx.fillText(label, cx, cy - 15);
+    }
+  }
+  if (on.slides && o.slides) {
+    for (const [y, x, , p, ey, ex] of o.slides) {
+      const [x0, y0] = P([y, x]), [x1, y1] = P([ey, ex]), a = Math.atan2(y1 - y0, x1 - x0);
+      ctx.strokeStyle = ctx.fillStyle = `rgba(255, 95, 162, ${0.35 + 0.65 * p})`; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(x0, y0, 5, 0, 7); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - 11 * Math.cos(a - 0.45), y1 - 11 * Math.sin(a - 0.45));
+      ctx.lineTo(x1 - 11 * Math.cos(a + 0.45), y1 - 11 * Math.sin(a + 0.45)); ctx.closePath(); ctx.fill();
+    }
+  }
+  if (on.path && o.path && o.path.length > 1) {
+    ctx.strokeStyle = "rgba(0,0,0,0.6)"; ctx.lineWidth = 7; ctx.beginPath();
+    o.path.forEach((p, i) => { const [x, y] = P(p); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.stroke();
+    ctx.strokeStyle = css("--path"); ctx.lineWidth = 3; ctx.setLineDash([8, 6]); ctx.beginPath();
+    o.path.forEach((p, i) => { const [x, y] = P(p); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.stroke(); ctx.setLineDash([]);
+  }
+  if (on.target && o.target) {
+    const [x, y] = P(o.target); ctx.strokeStyle = css("--path"); ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(x, y, 22, 0, 7); ctx.stroke(); ctx.beginPath(); ctx.arc(x, y, 4, 0, 7); ctx.fillStyle = css("--path"); ctx.fill();
+  }
+  if (on.oracle && o.oracle_box) {
+    const [y, x, h, w] = o.oracle_box; ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 2; ctx.setLineDash([5, 4]);
+    ctx.strokeRect(x * S - 3, y * S - 3, w * S + 6, h * S + 6); ctx.setLineDash([]);
+  }
+  if (on.cnn && o.cnn_box) {
+    const [y, x, h, w] = o.cnn_box; ctx.strokeStyle = "#35e0ff"; ctx.lineWidth = 3;
+    ctx.strokeRect(x * S, y * S, w * S, h * S);
+  }
+  if (o.click) {
+    const [x, y] = P(o.click); ctx.strokeStyle = "#fff"; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(x - 10, y - 10); ctx.lineTo(x + 10, y + 10); ctx.moveTo(x - 10, y + 10); ctx.lineTo(x + 10, y - 10); ctx.stroke();
+  }
+}
+
+// ------------------------------------------------------------------- panels
+function keyCanvas(values, title, ok) {
+  const c = document.createElement("canvas"); c.width = c.height = 3;
+  paint(c, 3, 3, i => PAL[values[i]] || [0, 0, 0]);
+  const d = document.createElement("div"); d.className = "k"; d.append(c);
+  d.insertAdjacentHTML("beforeend", `<div>${title}${ok === undefined ? "" : ok ? " ✓" : ""}</div>`); return d;
+}
+function renderPanels(t) {
+  const m = DATA.meta[t];
+  $("action").textContent = m.action;
+  $("why").textContent = m.why;
+  $("events").innerHTML = (m.events || []).map(([k, text]) => `<li style="--c:var(${(EV[k] || ["--muted"])[0]})">${text}</li>`).join("");
+  // key vs goal
+  $("keyCard").style.display = m.key ? "" : "none";
+  if (m.key) {
+    const box = $("keys"); box.innerHTML = "";
+    box.append(keyCanvas(m.key, "carried"));
+    (m.goals || []).forEach((g, i) => {
+      const same = g.every((v, k) => v === m.key[k]);
+      box.insertAdjacentHTML("beforeend", `<span class="match" style="color:${same ? css("--level") : css("--muted")}">${same ? "=" : "≠"}</span>`);
+      box.append(keyCanvas(g, `door ${i + 1}`, same));
+    });
+  }
+  // state table
+  const rows = { "level": `${m.level + 1}`, "attempt": m.attempt, ...m.info, ...Object.fromEntries(
+    Object.entries(m.stats || {}).map(([k, v]) => [k, typeof v === "number" ? +v.toFixed(3) : v])) };
+  $("info").innerHTML = Object.entries(rows).map(([k, v]) =>
+    `<tr><td>${k}</td><td>${Array.isArray(v) ? `(${v.join(", ")})` : v === true ? "yes" : v === false ? "no" : v ?? "-"}</td></tr>`).join("");
+  // action probabilities (MyAgent)
+  $("probsCard").style.display = m.probs ? "" : "none";
+  if (m.probs) {
+    const chosen = m.action.split(" ")[0];
+    $("probs").innerHTML = m.probs.map(([name, pc, pw]) => `
+      <div class="row ${name === chosen || (name.startsWith("click") && chosen === "ACTION6") ? "chosen" : ""}">
+        <span class="name">${name}</span>
+        <span><div class="track"><div class="fill" style="width:${pc * 100}%;background:var(--accent)"></div></div>
+              <div class="track" style="margin-top:2px"><div class="fill" style="width:${Math.min(1, pw) * 100}%;background:var(--level)"></div></div></span>
+        <span>${pc.toFixed(2)}<br>${pw.toFixed(2)}</span></div>`).join("");
+  }
+}
+function renderMaps(t) {
+  const m = DATA.meta[t], box = $("maps");
+  $("mapsCard").style.display = m.maps.length ? "" : "none";
+  box.innerHTML = "";
+  m.maps.forEach((title, j) => {
+    const d = document.createElement("div"); d.className = "map";
+    d.innerHTML = `<div class="t">${title}</div>`;
+    const c = document.createElement("canvas"); c.width = c.height = 256; d.append(c); box.append(d);
+    const data = mapAt(t, j), ctx = paint(c, 64, 64, i => MAGMA_LUT[data[i]]);
+    const o = m.overlay || {};
+    if (j === 0 && o.cnn_box) { const [y, x, h, w] = o.cnn_box, s = 4; ctx.strokeStyle = "#35e0ff"; ctx.lineWidth = 2; ctx.strokeRect(x * s, y * s, w * s, h * s); }
+    if (hoverPx) { const [x, y] = hoverPx; ctx.strokeStyle = "#fff"; ctx.lineWidth = 1; ctx.strokeRect(x * 4 - 2, y * 4 - 2, 8, 8); }
+  });
+  // network strip
+  $("netCard").style.display = m.layers.length ? "" : "none";
+  if (m.layers.length) {
+    const net = $("net"); net.innerHTML = "";
+    const add = (canvasFill, label) => {
+      if (net.children.length) net.insertAdjacentHTML("beforeend", `<span class="arrow">→</span>`);
+      const d = document.createElement("div"); d.className = "layer";
+      const c = document.createElement("canvas"); c.width = c.height = 156; d.append(c);
+      d.insertAdjacentHTML("beforeend", `<div class="lt">${label}</div>`); net.append(d); canvasFill(c);
+    };
+    add(c => paint(c, 64, 64, i => PAL[frameAt(t)[i]] || [0, 0, 0]), "input · 16 colour planes");
+    const L = DATA.layer_size;
+    m.layers.forEach((title, j) => { const data = layerAt(t, j); add(c => paint(c, L, L, i => MAGMA_LUT[data[i]]), title); });
+    m.maps.forEach((title, j) => { const data = mapAt(t, j); add(c => paint(c, 64, 64, i => MAGMA_LUT[data[i]]), title.replace("CNN: ", "out · ")); });
+  }
+}
+function renderHover(t) {
+  if (!hoverPx) return;
+  const [x, y] = hoverPx, i = y * 64 + x, m = DATA.meta[t];
+  const parts = m.maps.map((title, j) => `${title.replace("CNN: ", "")}: <b>${(mapAt(t, j)[i] / 255).toFixed(2)}</b>`);
+  $("hover").innerHTML = `pixel (x ${x}, y ${y}) · colour ${frameAt(t)[i]}${parts.length ? " · " + parts.join(" · ") : ""}`;
+}
+
+// ------------------------------------------------------------------ timeline
+function eventSteps(kind) {
+  return DATA.meta.map((m, i) => (m.events || []).some(([k]) => kind === "all" || k === kind) ? i : -1).filter(i => i >= 0);
+}
+function drawTimeline() {
+  const c = $("timeline"), dpr = window.devicePixelRatio || 1;
+  c.width = c.clientWidth * dpr; c.height = c.clientHeight * dpr;
+  const ctx = c.getContext("2d"), W = c.width, H = c.height, n = DATA.steps, bw = W / n;
+  const shades = ["#c9d6ea", "#b7c9e6", "#d6cde8", "#c7e0d3", "#e6d9c2", "#e3c9cf", "#cfe3e6", "#dcd3c3", "#d0d0d8"];
+  DATA.meta.forEach((m, i) => {
+    ctx.fillStyle = (m.why || "").startsWith("warm-up") ? "#9a9aa2" : shades[m.level % shades.length];
+    ctx.fillRect(i * bw, 0, Math.ceil(bw), H);
+  });
+  DATA.meta.forEach((m, i) => (m.events || []).forEach(([k]) => {
+    ctx.fillStyle = css((EV[k] || ["--muted"])[0]);
+    const h = k === "edge" || k === "slide" ? H * 0.3 : k === "surprise" ? H * 0.8 : k === "learn" || k === "miss" ? H * 0.55 : H;
+    ctx.fillRect(i * bw, H - h, Math.max(2 * dpr, bw), h);
+  }));
+  ctx.fillStyle = css("--ink"); ctx.fillRect(cur * bw - dpr, 0, Math.max(2 * dpr, bw) + 2 * dpr, H);
+  ctx.font = `${11 * dpr}px system-ui`; ctx.fillStyle = "#333";
+  let last = -1; DATA.meta.forEach((m, i) => { if (m.level !== last) { last = m.level; ctx.fillText(`L${m.level + 1}`, i * bw + 3 * dpr, 13 * dpr); } });
+}
+const SERIES = [["cnn_conf", "CNN confidence (player window)", "#35b5e0", [0, 1]], ["resource", "resource", "#e0b12f", null],
+                ["loss", "CNN training loss", "#d64545", null], ["P(change)", "P(change) of chosen move", "#2f6fde", [0, 1]]];
+function drawSpark() {
+  const c = $("spark"), dpr = window.devicePixelRatio || 1;
+  c.width = c.clientWidth * dpr; c.height = c.clientHeight * dpr;
+  const ctx = c.getContext("2d"), W = c.width, H = c.height, n = DATA.steps;
+  ctx.clearRect(0, 0, W, H);
+  const present = SERIES.filter(([k]) => DATA.meta.some(m => m.stats && typeof m.stats[k] === "number"));
+  present.forEach(([k, , color, range]) => {
+    const vals = DATA.meta.map(m => m.stats ? m.stats[k] : null);
+    const nums = vals.filter(v => typeof v === "number");
+    const lo = range ? range[0] : Math.min(...nums), hi = range ? range[1] : Math.max(...nums);
+    ctx.strokeStyle = color; ctx.lineWidth = 1.5 * dpr; ctx.beginPath(); let pen = false;
+    vals.forEach((v, i) => {
+      if (typeof v !== "number") { pen = false; return; }
+      const x = (i + 0.5) / n * W, y = H - 3 * dpr - (v - lo) / Math.max(1e-9, hi - lo) * (H - 6 * dpr);
+      pen ? ctx.lineTo(x, y) : ctx.moveTo(x, y); pen = true;
+    });
+    ctx.stroke();
+  });
+  ctx.fillStyle = css("--ink"); ctx.fillRect((cur + 0.5) / n * W - dpr, 0, 2 * dpr, H);
+  $("legend").innerHTML = Object.entries(EV).map(([k, [v, t]]) => `<span><i style="background:var(${v})"></i>${t}</span>`).join("")
+    + `<span><i style="background:#9a9aa2"></i>warm-up move</span>`
+    + present.map(([, t, color]) => `<span><i style="background:${color};height:3px"></i>${t}</span>`).join("");
+}
+
+// ------------------------------------------------------------------ driving
+function render() {
+  const t = cur, ctx = paint($("game"), 64, 64, i => PAL[frameAt(t)[i]] || [0, 0, 0]);
+  drawOverlay(ctx, t);
+  renderPanels(t); renderMaps(t); renderHover(t); drawTimeline(); drawSpark();
+  $("slider").value = t; $("stepno").textContent = `step ${t} / ${DATA.steps - 1}`;
+}
+function go(t) { cur = Math.max(0, Math.min(DATA.steps - 1, t)); render(); }
+function jumpEvent(dir) {
+  const steps = eventSteps($("evFilter").value);
+  const target = dir > 0 ? steps.find(i => i > cur) : [...steps].reverse().find(i => i < cur);
+  if (target !== undefined) go(target);
+}
+function togglePlay() {
+  if (timer) { clearInterval(timer); timer = null; $("play").textContent = "▶ play"; return; }
+  $("play").textContent = "⏸ pause";
+  timer = setInterval(() => { if (cur >= DATA.steps - 1) togglePlay(); else go(cur + 1); }, +$("speed").value);
+}
+function timelineClick(e) { const r = e.target.getBoundingClientRect(); go(Math.floor((e.clientX - r.left) / r.width * DATA.steps)); }
+
+async function main() {
+  [frames, maps, layers, motion] = await Promise.all([DATA.frames, DATA.maps, DATA.layers, DATA.motion].map(inflate));
+  document.title = `${DATA.game} replay`;
+  $("title").textContent = `${DATA.game} · ${DATA.summary.agent || DATA.agent}`;
+  $("summary").innerHTML = Object.entries(DATA.summary).filter(([k]) => !["agent", "grid"].includes(k))
+    .map(([k, v]) => `<span class="chip">${k} <b>${Array.isArray(v) ? v.join(" / ") : v}</b></span>`).join("");
+  $("slider").max = DATA.steps - 1;
+  buildToggles();
+  $("slider").oninput = e => go(+e.target.value);
+  $("first").onclick = () => go(0); $("prev").onclick = () => go(cur - 1); $("next").onclick = () => go(cur + 1);
+  $("prevEv").onclick = () => jumpEvent(-1); $("nextEv").onclick = () => jumpEvent(1); $("play").onclick = togglePlay;
+  $("speed").onchange = () => { if (timer) { togglePlay(); togglePlay(); } };
+  $("timeline").onclick = timelineClick; $("spark").onclick = timelineClick;
+  $("game").onmousemove = e => { const r = e.target.getBoundingClientRect();
+    hoverPx = [Math.floor((e.clientX - r.left) / r.width * 64), Math.floor((e.clientY - r.top) / r.height * 64)];
+    renderHover(cur); renderMaps(cur); };
+  $("game").onmouseleave = () => { hoverPx = null; renderMaps(cur); };
+  document.addEventListener("keydown", e => {
+    if (e.target.tagName === "SELECT") return;
+    if (e.key === "ArrowRight") go(cur + (e.shiftKey ? 10 : 1));
+    else if (e.key === "ArrowLeft") go(cur - (e.shiftKey ? 10 : 1));
+    else if (e.key === " ") { e.preventDefault(); togglePlay(); }
+    else if (e.key.toLowerCase() === "n") jumpEvent(1);
+    else if (e.key.toLowerCase() === "p") jumpEvent(-1);
+    else if (e.key === "Home") go(0); else if (e.key === "End") go(DATA.steps - 1);
+  });
+  window.addEventListener("resize", () => { drawTimeline(); drawSpark(); });
+  render();
+}
+main();
+</script>
+</body>
+</html>

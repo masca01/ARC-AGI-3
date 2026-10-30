@@ -173,6 +173,7 @@ class ControlPerception:
         self.n_labels = 0
         self.train_steps = 0
         self.last_loss: float | None = None
+        self.last_confidence: float | None = None   # mean control probability inside the chosen window
 
     # ------------------------------------------------------------ learned geometry
     @property
@@ -267,6 +268,22 @@ class ControlPerception:
         p = torch.sigmoid(self.net(one_hot(frame[None])))[0].numpy()
         return p[0], p[1]
 
+    @torch.no_grad()
+    def layer_maps(self, frame: np.ndarray) -> list[tuple[str, np.ndarray]]:
+        """What each conv layer responds to: channel-mean activation, 32x32, scaled to 0..1 (for replays)."""
+        self.net.eval()
+        x, out, n = one_hot(frame[None]), [], 0
+        rf = 1
+        for layer in self.net.body:
+            x = layer(x)
+            if isinstance(layer, nn.Conv2d):
+                rf += (layer.kernel_size[0] - 1) * layer.dilation[0]
+            if isinstance(layer, nn.ReLU):
+                n += 1
+                m = F.avg_pool2d(x.mean(dim=1, keepdim=True), 2)[0, 0].numpy()
+                out.append((f"conv{n} · sees {rf}px", m / max(1e-6, float(m.max()))))
+        return out
+
     def top_left(self, frame: np.ndarray) -> tuple[int, int] | None:
         """Pixel top-left corner of the controlled object.
 
@@ -281,6 +298,7 @@ class ControlPerception:
         c = np.pad(control, ((1, 0), (1, 0))).cumsum(0).cumsum(1)
         window = c[h:, w:] - c[:-h, w:] - c[h:, :-w] + c[:-h, :-w]     # sum of every h x w window
         y0, x0 = np.unravel_index(int(window.argmax()), window.shape)
+        self.last_confidence = float(window[y0, x0]) / (h * w)
         if window[y0, x0] < self.THRESHOLD * h * w / 2:                # no object-like evidence
             return None
         return int(y0), int(x0)
