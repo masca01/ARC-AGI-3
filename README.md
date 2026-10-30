@@ -192,6 +192,31 @@ Result: **level 7 is solved in 219 actions (human baseline 186), and the whole g
 611 actions, without a single game over.** Memory at the end of level 7: goal 1/1, refills 6/6, tiles
 2/2.
 
+### No more stepping back and forth: plan commitment (`COMMIT = True`)
+
+The planner used to search again from scratch every step. Its model changes a little every step:
+moving-tile phases, and slide predictions made from the current frame. Its search is also capped. So two
+consecutive plans could point in opposite directions. On level 4 the agent went (4,9) ↔ (4,10) twenty
+times in a row towards the same target, with 41 returns to the cell it had just left in that level.
+
+Now the agent keeps executing its plan, like a person following a route, and replans only when:
+- the last step did not turn out as predicted (player cell, or the key changed where no tile was
+  expected);
+- it learned something since the plan was made (step cost, a tile's role, a new non-local move, known
+  tiles, consumed refills, open goals). This was the bug on level 2: the plan was made believing a step
+  costs 1, the agent then learned it costs 2, and the old plan ran out of resource;
+- the rest of the plan is no longer possible, including running out of resource when re-simulated;
+- a full solution of the level appears.
+
+| | L1 | L2 | L3 | L4 | L5 | L6 | L7 | Total | Runtime |
+|---|---|---|---|---|---|---|---|---|---|
+| replan every step | 25 | 45 | 41 | 135 | 58 | 88 | 219 | 611 | 141 s |
+| commit + verify | 25 | 45 | 41 | **66** | 58 | 88 | **120** | **443** | **86 s** |
+
+Returns to the cell just left: level 4 from 41 to 7, level 7 from 49 to 24. The remaining ones are mostly
+deliberate (stepping off a tile and back on to use it again). Level 7 is now below the human baseline
+(186).
+
 ### Results on ls20 (deterministic, one run)
 
 | Agent | Levels | Actions on levels 1 / 2 / 3 / 4 | CNN finds the player's cell |
@@ -201,7 +226,8 @@ Result: **level 7 is solved in 219 actions (human baseline 186), and the whole g
 | `causal` (hand-made perception) | 4 | 13 / 45 / 41 / 148 | - |
 | `causal-neural` (CNN perception) | 4 | 25 / 45 / 41 / 148 | 100% of 449 frames, levels 1-5 |
 | `causal-slides` (CNN perception + SlideNet + objectives) | 6 | 25 / 45 / 41 / 86 / 126 / 88 (levels 5, 6) | 100% |
-| `causal-slides` + limited vision + object memory | **7 (WIN)** | 25 / 45 / 41 / 135 / 58 / 88 / **219** | 98.3% |
+| `causal-slides` + limited vision + object memory | 7 (WIN) | 25 / 45 / 41 / 135 / 58 / 88 / 219 | 98.3% |
+| ... + plan commitment | **7 (WIN), 443 actions** | 25 / 45 / 41 / **66** / 58 / 88 / **120** | |
 
 With the CNN, levels 2-4 are solved in exactly the same moves as with the hand-made detector. Level 1
 costs the 12 warm-up moves the CNN needs to learn what it controls. Without SlideNet, level 5 is
@@ -310,6 +336,10 @@ Comparison on the same 6 games and budget (one run each, so a difference of one 
 - The causal agent only works on `ls20`: everything except the player detector still assumes ls20's colours, 5 px grid and HUD layout, and it never clicks.
 
 ## Changelog
+
+### 2026-10-29 - plan commitment: no back-and-forth
+- The planner keeps executing its plan while each step turns out as predicted and nothing new was learned, and replans otherwise (`commit_plans`, `CausalAgent.COMMIT`).
+- Result on ls20: still won, in 443 actions instead of 611 (level 4: 66 instead of 135, level 7: 120 instead of 219) and 86 s instead of 141 s. The full-game test now also requires at most 480 actions.
 
 ### 2026-10-29 - object memory: ls20 won (7/7)
 - Added `agent/memory.py`: a game-agnostic object memory of goals (with their pattern), tiles (with their role) and refills, with present/hidden/used/gone statuses, and restoration of used objects after a restart.

@@ -24,7 +24,11 @@ Ported unchanged except for:
     in view is deleted, so used refills are forgotten for the rest of the level),
   - `careful_exploration`: exploratory moves (reveal, frontier, gate tests, refills, fallback) treat
     known mechanism tiles as obstacles unless they are the target, so exploring never undoes progress
-    on the key by accident. Deliberate experiments and the solution plan still use them.
+    on the key by accident. Deliberate experiments and the solution plan still use them,
+  - `commit_plans`: keep executing the chosen plan while every step turns out as predicted, instead of
+    searching again from scratch each step. Replanning every step with a model that changes a little
+    each step (moving-tile phases, slide predictions from the current frame) and a capped search made
+    consecutive plans point in opposite directions, so the agent stepped back and forth.
 """
 from __future__ import annotations
 
@@ -270,6 +274,9 @@ class LS20ExtendedStateAgent:
         self.track_objectives = False
         self.use_memory = False
         self.careful_exploration = False
+        self.commit_plans = False
+        self.committed: Optional[dict] = None
+        self.plan_reuses = 0
         self.memory = ObjectMemory()
         self.memory_events: List[Tuple[str, str]] = []
         self.key_box: Optional[Tuple[int, int, int, int]] = None   # HUD key box (x0, y0, w, h), kept across levels
@@ -1190,6 +1197,53 @@ class LS20ExtendedStateAgent:
                 return path, f"explore:reveal@{cell}"
         return None
 
+    def commit(self, scene: Scene, plan: List[GameAction], reason: str) -> None:
+        """Remember the plan and what its first step should lead to, to check it next step."""
+        self.committed = None
+        if len(plan) < 2 or reason == "fallback":
+            return
+        nxt = self.transition_position(scene.player, plan[0], scene.dynamic_config)
+        if nxt is None:
+            return
+        cell = nxt[0]
+        # the key may legitimately change where a tile or a moving tile is expected
+        changes_key = cell in self.tiles or bool(self.mobile_signatures_at(cell, self.level_tick + 1))
+        self.committed = dict(level=scene.level, rest=list(plan[1:]), reason=reason, expect_pos=cell,
+                              expect_key=None if changes_key else scene.key, model=self.model_version())
+
+    def model_version(self) -> tuple:
+        """Changes whenever what the agent knows changes: then a committed plan is out of date."""
+        return (self.step_cost, len(self.dynamic_edges), len(self.blocked_edges), frozenset(self.tiles),
+                tuple(sorted((sig, m.role) for sig, m in self.models.items())), frozenset(self.consumed),
+                frozenset(self.moving_signatures), tuple(sorted(self.open_doors())))
+
+    def continue_plan(self, scene: Scene, restarting: bool) -> Optional[Tuple[List[GameAction], str]]:
+        """The committed plan, if the last step went as predicted and the rest is still possible."""
+        c, self.committed = self.committed, None
+        if c is None or restarting or c["level"] != scene.level:
+            return None
+        if scene.player != c["expect_pos"] or (c["expect_key"] is not None and scene.key != c["expect_key"]):
+            return None                                   # surprise: the model was wrong, replan
+        if c["model"] != self.model_version():
+            return None                                   # learned something since the plan was made
+        if c["reason"] != "execute:temporal-state-plan" and self.joint_plan(scene):
+            return None                                   # a full solution exists now: take it
+        free = set(self.free_memory) | set(self.doors) | {scene.player}
+        refills = {pos for pos, tile in self.tiles.items() if pos not in self.consumed and (
+            tile.kind == "pickup_visual" or (self.models.get(tile.signature) and self.models[tile.signature].role == "resource"))}
+        pos, config, resource = scene.player, scene.dynamic_config, scene.resource
+        for action in c["rest"]:
+            nxt = self.transition_position(pos, action, config)
+            if nxt is None or nxt[0] not in free:
+                return None                               # the rest of the plan is no longer possible
+            pos, config = nxt
+            resource -= self.step_cost
+            if pos in refills:
+                resource, refills = self.resource_capacity, refills - {pos}
+            if resource < 0:
+                return None                               # the rest of the plan would run out of resource
+        return c["rest"], c["reason"]
+
     def choose_plan(self, scene: Scene) -> Tuple[List[GameAction], str]:
         solution = self.joint_plan(scene)
         if solution:
@@ -1282,7 +1336,14 @@ class LS20ExtendedStateAgent:
         self.seen[semantic] += 1
         if self.seen[semantic] > 1:
             self.semantic_repeats += 1
-        plan, self.reason = self.choose_plan(scene)
+        kept = self.continue_plan(scene, restarting) if self.commit_plans else None
+        if kept is not None:
+            plan, self.reason = kept
+            self.plan_reuses += 1
+        else:
+            plan, self.reason = self.choose_plan(scene)
+        if self.commit_plans:
+            self.commit(scene, plan, self.reason)
         self.last_plan = list(plan)
         action = plan[0] if plan else GameAction.ACTION1
         if self.verbose and self.reason != self.last_reason:

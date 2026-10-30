@@ -117,6 +117,8 @@ def test_full_game_won_with_limited_vision_level_7():
     agent.main()
     assert agent.frames[-1].state.name == "WIN", agent.level_actions
     assert agent.frames[-1].levels_completed == 7
+    # plan commitment: no stepping back and forth (443 actions; 611 when replanning every step)
+    assert sum(agent.level_actions[:7]) <= 480, agent.level_actions
 
 
 def test_object_memory_keeps_used_refills_for_the_next_attempt():

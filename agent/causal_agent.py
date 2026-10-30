@@ -47,6 +47,7 @@ class CausalAgent(Agent):
     SLIDES = False               # learn pushes with SlideNet
     OBJECTIVES = True            # track which goals are still open (several doors per level)
     MEMORY = True                # remember objectives, tiles and refills (including used ones)
+    COMMIT = True                # keep executing a plan while it turns out as predicted
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
@@ -57,6 +58,7 @@ class CausalAgent(Agent):
         self.planner.track_objectives = self.OBJECTIVES
         self.planner.use_memory = self.MEMORY
         self.planner.careful_exploration = self.MEMORY
+        self.planner.commit_plans = self.COMMIT
         self.slides = SlideLearner(seed=0) if self.SLIDES else None
         self.slide_events: list = []             # filled by the slide hook during this step
         if self.slides is not None:
@@ -259,4 +261,5 @@ class CausalAgent(Agent):
             "loss": p.last_loss if p else None,
             "models": {k: v.role for k, v in self.planner.models.items()},
             "slides": self.slides.stats() if self.slides is not None else None,
+            "plan reuses": self.planner.plan_reuses,
         }
