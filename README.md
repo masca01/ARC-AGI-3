@@ -16,6 +16,7 @@ ARC-AGI-3/
 │   ├── memory.py        game-agnostic object memory: objectives, tiles, refills (used ones too) per level
 │   ├── gauge.py         discovers a resource bar from how it drains, with no place or colour given
 │   ├── general_agent.py plays any game with no game-specific knowledge: exploration graph of states
+│   ├── cell_net.py      CNN that learns from a solved level which objects are in the wrong state
 │   ├── progress_net.py  experimental CNN: how close a state is to a win (off, no gain so far)
 │   ├── base.py          minimal Agent base class, so the agent runs without the official framework
 │   └── __init__.py      marks agent/ as a Python package
@@ -251,7 +252,7 @@ Still fixed for ls20: the parser's key box, doors, tiles and colours. Run it wit
 ## General agent (`agent/general_agent.py`, `--agent general`)
 
 `CausalAgent` wins ls20 but its parser is written for ls20. `GeneralAgent` plays any game with no knowledge
-of keys, doors, players or colours. It uses no neural network by default.
+of keys, doors, players or colours. Its only network in use is CellNet, on games where it applies (below).
 
 - **State:** a frame without its resource bars (`gauge.py`) and without whatever differs between two starts of the
   same level, such as a life icon.
@@ -277,7 +278,7 @@ Levels solved in 2000 actions. `general` is the number of seeds out of 3 that so
 | m0r0 | held out | 1 of 3 (35 actions) | 1 (1185 actions) | 0 |
 | sb26 | held out | 0 of 3 | 0 | 0 |
 
-**Level 2 is the wall.** No run solved one, on development games even with 10000 actions. Trying every click at the
+**Level 2 is the wall for search.** No run of the search alone solved one, on development games even with 10000 actions. Trying every click at the
 start of level 2 shows why: in r11l almost any free pixel reacts and the answer is a computed spot on the
 screen, not an object; ft09 has 13 independent tiles, about 8000 combinations, and the right one must be
 inferred from hint tiles. These levels need a rule to be understood, and more search will not find it.
@@ -287,8 +288,36 @@ levels), and carrying the shapes on a solution over to the next level. ProgressN
 `PROGRESS = True`) is a CNN trained after each solved level on the distance to the win read from the graph, meant
 to order exploration on later levels. It solved no level 2 in 3000 actions, so it is off.
 
-The next step is learning what a level asks for: comparing a solved level's final state with its start,
-and clicking at computed places rather than only on objects. The replay viewer does not support `--agent general`; run the same play through `causal-slides` to see it.
+### CellNet: learning what a level asks for (`agent/cell_net.py`)
+
+The first step past level 1 is `ft09`. A solved level shows many objects of one shape the way the level wants them,
+and recolouring some of them at random gives examples of wrong objects, so one level is enough to train on. A small
+CNN sees each object from its own point of view: a 32 x 32 crop centred on it, where a pixel counts as "my colour" or
+"another cell colour" rather than by name. Later levels click what it sees as wrong before exploring. If everything
+looks right and the level goes on, the agent tries the object it is least sure about. Three nets are averaged.
+
+It trains only when a solved level was about whole objects of one shape changing colour, and on at least 4 of them.
+The winning frame is never shown, so the agent works it out from what that click did before.
+
+`ft09`, 1500 actions, 3 seeds, actions per level. Human baseline: 43, 12, 23, 28, 65, 37.
+
+| Seed | Before | With CellNet |
+|---|---|---|
+| 0 | 414 | 414, 7, 58, level 4 unsolved |
+| 1 | 598 | 598, 7, 14, level 4 unsolved |
+| 2 | 892 | 892, 7, 14, level 4 unsolved |
+
+Level 2 takes 7 actions on every seed, and level 3 takes 14 on two seeds of three, against 12 and 23 for the human.
+Each uses only the rule learned on the levels before. With one net
+all seeds also reach level 3, but levels 2 and 3 cost 29 to 374 actions in total, against 21 to 65 with three.
+
+**Limits.** It helped `ft09` only. On the other six games it never trained, and all their results are exactly as
+before. Level 4 has three tile colours, and in the run we checked CellNet got 4 of 18 tiles wrong there. Level 1 is still found by
+search. These first attempts did not work: a CNN on the whole frame did not learn at all, training longer made it
+worse on new layouts (6 of 18 wrong on level 4 at 3000 steps), and a net that votes place by place did not learn.
+
+The next step is more of this on other games: clicking at computed places (`r11l`) and using objects to reconnect the
+planner (`bp35`, `m0r0`). The replay viewer does not support `--agent general`; run the same play through `causal-slides` to see it.
 
 ### Other games: held-out test and fallback
 
@@ -330,8 +359,8 @@ The fallback is now `GeneralAgent`. `causal-slides`, 2000 actions, 3 seeds, meas
 | sb26 | step 0 | 0 of 3 | - |
 
 So one agent now wins ls20 and solves level 1 on 6 of the 7 games, 15 of 21 runs. On games with no arrow keys it
-plays exactly as `general` does. On bp35 and m0r0 the CNN's warm-up moves come first, and the numbers moved a little
-from `general` alone, within what 3 seeds can tell apart. No level 2 here either. A takeover inside a level does not
+plays exactly as `general` does, so `ft09` also gets CellNet. On bp35 and m0r0 the CNN's warm-up moves come first, and the numbers moved a little
+from `general` alone, within what 3 seeds can tell apart. These figures are from before CellNet, and only `ft09` has changed since. A takeover inside a level does not
 count its first frame as the level's start, otherwise the player's cells would be ignored at the next restart.
 The held-out games were run again here to measure this change, and nothing was tuned on them.
 
@@ -462,6 +491,9 @@ Comparison on the same 6 games and budget (one run each, so a difference of one 
 ### 2026-10-30 - GaugeFinder: the energy bar is discovered, not hard-coded
 - New `agent/gauge.py` and `run_local.py --agent causal-gauge`. Finds a resource bar from how it drains, reads it,
   and learns from a restart that an empty gauge costs a life. ls20 result unchanged: WIN in 443 actions.
+
+### 2026-10-31 - CellNet: `ft09` solves levels 2 and 3
+- `GeneralAgent` trains `agent/cell_net.py` on a solved level about recolouring objects, then clicks what it sees as wrong. `ft09` goes from 1 level to 3 on all 3 seeds, with level 2 in 7 actions (human baseline 12). The other six games are unchanged: CellNet does not train there.
 
 ### 2026-10-30 - `GeneralAgent` is the fallback
 - `CausalAgent` hands over to `GeneralAgent` instead of `MyAgent`. ls20 is unchanged (WIN in 443 actions). Over 3 seeds at 2000 actions, 15 of 21 runs solve a level. Replays of fallback games show what it did, with no network map.

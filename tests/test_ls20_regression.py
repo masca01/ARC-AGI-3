@@ -236,6 +236,42 @@ def test_general_agent_routes_must_be_affordable():
     assert graph.route(b"a", goal, 1) is None
 
 
+def test_cell_net_solves_a_second_level_from_the_rule_of_the_first():
+    """ft09: nothing can search level 2. CellNet learns the rule on level 1 and needs one click per wrong tile."""
+    agent = play_general("ft09", 450)
+    assert agent.frames[-1].levels_completed >= 2
+    assert agent.level_actions[1] <= 12            # the human baseline for this level
+
+
+def test_cell_view_describes_pixels_relative_to_the_cell():
+    from agent.cell_net import view
+
+    frame = np.full((64, 64), 4, np.int16)
+    frame[20:26, 20:26] = 9                        # the cell
+    frame[20:26, 28:34] = 12                       # another one, in another colour
+    frame[30, 30] = 0                              # a fixed colour
+    renamed = frame.copy()
+    renamed[frame == 9], renamed[frame == 12] = 14, 15
+    box = (20, 20, 25, 25)
+    assert (view(frame, box, {9, 12}, {0}) == view(renamed, box, {14, 15}, {0})).all()
+    assert view(frame, box, {9, 12}, {0})[0].sum() == 36
+
+
+def test_cell_net_only_trains_on_levels_about_whole_objects_changing_colour():
+    from agent.general_agent import Step
+
+    agent = GeneralAgent(card_id="local", game_id="test", agent_name="test", ROOT_URL="http://localhost",
+                         record=False, arc_env=None)
+    before = np.full((64, 64), 4, np.uint8)
+    for x in (10, 20, 30, 40, 50):
+        before[10:16, x:x + 6] = 9
+    after = before.copy()
+    after[10:13, 10:16] = 8                        # half of an object changed: it moved or was cut, not recoloured
+    agent.history = [Step(before, (12, 12), after, 1)]
+    agent._learn_cells(after, (12, 12))
+    assert not agent.cell_learner.ready
+
+
 def test_click_game_falls_back_to_the_general_explorer():
     """A game without arrow keys (ft09) must not crash: the agent hands over to GeneralAgent."""
     import arc_agi

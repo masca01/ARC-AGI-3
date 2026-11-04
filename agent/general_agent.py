@@ -13,6 +13,8 @@ same situation does the same thing. Nothing here knows about keys, doors, player
   transfer   objects are grouped by appearance. What a kind of object did (react or not) is kept across
              levels, so later levels skip what never reacted. Each solved level also trains ProgressNet
              (progress_net.py), and later levels explore first where it sees a state close to a win
+  cells      when a solved level was about changing the colour of same-shaped objects, it trains CellNet
+             (cell_net.py), and later levels click the objects it sees as wrong before exploring
 
 Contract (same as the official framework and Kaggle):
   class GeneralAgent(Agent) with is_done(frames, latest_frame) and choose_action(frames, latest_frame)
@@ -34,6 +36,7 @@ try:  # inside the official ARC-AGI-3-Agents framework (and on Kaggle)
 except ImportError:  # local development in this repo
     from .base import Agent
 
+from .cell_net import HIDDEN, CellLearner
 from .gauge import GaugeFinder
 from .model import CLICK_ID, to_array
 from .progress_net import ProgressLearner
@@ -47,6 +50,8 @@ class Target:
     """One thing the agent can do in a state."""
     action: ActionKey
     kind: Hashable                       # what kind of action or object this is
+    box: tuple[int, int, int, int] | None = None     # y0 x0 y1 x1, for an object
+    pixels: np.ndarray | None = None     # its pixels in the frame, for an object
 
 
 def objects(frame: np.ndarray, ignore: np.ndarray, max_area: float = 0.25) -> list[Target]:
@@ -62,7 +67,10 @@ def objects(frame: np.ndarray, ignore: np.ndarray, max_area: float = 0.25) -> li
             middle = len(ys) // 2                  # a pixel of the object itself, not its bounding-box centre
             y, x = int(ys[middle] + box[0].start), int(xs[middle] + box[1].start)
             shape = hashlib.blake2b(np.packbits(mask).tobytes() + bytes(mask.shape), digest_size=6).digest()
-            targets.append(Target((x, y), (int(colour), shape)))
+            whole = np.zeros(frame.shape, bool)
+            whole[box][mask] = True
+            corners = (box[0].start, box[1].start, box[0].stop - 1, box[1].stop - 1)
+            targets.append(Target((x, y), (int(colour), shape), corners, whole))
     return targets
 
 
@@ -170,6 +178,9 @@ class GeneralAgent(Agent):
     MAX_ACTIONS = 2000
     SEED = 0
     PROGRESS = False         # let ProgressNet order the exploration once a level was solved (no gain so far)
+    CELLS = True             # let CellNet choose clicks once a level about object colours was solved
+    MIN_CELLS = 4            # fewer cells than this in a solved level are not worth training on
+    CELL_CLICKS = 4          # clicks on one cell before CellNet leaves it alone in this attempt
     DETOUR_COST = 0.02       # value a state must offer per extra action of walking to it
     LOW_GAUGE = 0.1          # a death below this share of the gauge is blamed on the gauge, not the action
     SAME_START = 0.01        # two frames this close (share of pixels) are the same start of a level
@@ -182,6 +193,11 @@ class GeneralAgent(Agent):
         self.places = KindStats()                # by place on screen, this level only
         self.why_counts: Counter = Counter()
         self.progress = ProgressLearner() if self.PROGRESS else None
+        self.cell_learner = CellLearner(self.SEED) if self.CELLS else None
+        self.cell_shapes: set[Hashable] = set()  # shapes CellNet was trained on
+        self.cell_clicks: Counter = Counter()    # this attempt: clicks CellNet asked for, by place
+        self.dead_cells: set[ActionKey] = set()  # this level: places that did not react to CellNet's click
+        self.doubted: set[ActionKey] = set()     # this level: cells tried against CellNet's opinion
         self.ignore = np.zeros((64, 64), bool)   # pixels that do not describe the situation, this level
         self.graph = LevelGraph()
         self.history: list[Step] = []            # this level, for rebuilding the graph
@@ -208,6 +224,7 @@ class GeneralAgent(Agent):
             self.resets += latest_frame.state is GameState.GAME_OVER
             self.route = []
             self.restarting = True
+            self.cell_clicks.clear()
             self.last_choice = {"action": "RESET", "why": "start of game or game over"}
             return GameAction.RESET
 
@@ -298,6 +315,9 @@ class GeneralAgent(Agent):
         self.level = level
         self.graph, self.history, self.route = LevelGraph(), [], []
         self.places = KindStats()
+        self.cell_clicks.clear()
+        self.dead_cells.clear()
+        self.doubted.clear()
         self.ignore = np.zeros((64, 64), bool)
         self.level_start = None
         self.prev = None
@@ -316,10 +336,13 @@ class GeneralAgent(Agent):
         if kind is not None:
             self.kinds.update(kind, target != key)
             self.places.update(action, target != key)
+        if target == key and action in self.cell_clicks:
+            self.dead_cells.add(action)
         if died and self.gauge.gauge is not None and value and value > self.LOW_GAUGE * self.gauge.capacity:
             node.fatal.add(action)             # not out of energy: this action itself is deadly here
         if solved:
             self._learn_from_win(key)
+            self._learn_cells(before, action)
         if died or solved:
             return                             # a death or a new level is not a place in this graph
         refilled = value is not None and after_value is not None and after_value > value
@@ -341,6 +364,46 @@ class GeneralAgent(Agent):
         distance = self.graph.distance_to(last)
         self.progress.add_level([(n.frame, None if k not in distance else distance[k] + 1)
                                  for k, n in self.graph.nodes.items()])
+
+    def _learn_cells(self, last: np.ndarray, action: ActionKey) -> None:
+        """A level solved by recolouring same-shaped objects shows how those objects should look."""
+        if self.cell_learner is None or not isinstance(action, tuple) or not self.history:
+            return
+        mask = self._mask()
+        changed = np.logical_or.reduce([s.before != s.after for s in self.history]) & ~mask
+        final = self._after_click(last, action, mask)
+        found = objects(final, mask)
+        shapes = {t.kind[1] for t in found if changed[t.pixels].all()}
+        colours = sorted({int(c) for s in self.history for f in (s.before, s.after) for c in np.unique(f[changed])})
+        cells = [t for t in found if t.kind[1] in shapes and t.kind[0] in colours]
+        if len(cells) < self.MIN_CELLS or not changed[~np.logical_or.reduce([t.pixels for t in cells])].sum() == 0:
+            return                             # something other than whole objects changed colour
+        hidden = np.where(mask, HIDDEN, final.astype(np.int16))
+        self.cell_learner.add_level(hidden, [(t.pixels, t.box) for t in cells], colours)
+        self.cell_learner.train()
+        self.cell_shapes |= shapes
+
+    def _after_click(self, last: np.ndarray, action: ActionKey, mask: np.ndarray) -> np.ndarray:
+        """The frame a winning click produced is never shown: the next level comes instead."""
+        final = last.copy()
+        same = next((s for s in reversed(self.history) if s.action == action and (s.before != s.after).any()), None)
+        if same is not None:
+            moved = (same.before != same.after) & ~mask
+            for colour in np.unique(same.before[moved]):       # the same place reacts the same way
+                wanted = moved & (same.before == colour)
+                final[wanted & (final == colour)] = same.after[wanted][0]
+                others = wanted & (final != same.after[wanted][0])
+                final[others] = colour
+            return final
+        changes = {(int(a), int(b)) for s in self.history for a, b in zip(s.before[s.before != s.after],
+                                                                          s.after[s.before != s.after])}
+        x, y = action
+        clicked = next((t for t in objects(last, mask) if t.pixels[y, x]), None)
+        if clicked is not None:
+            next_colour = next((b for a, b in changes if a == clicked.kind[0]), None)
+            if next_colour is not None:
+                final[clicked.pixels] = next_colour
+        return final
 
     def _value(self, key: bytes) -> float:
         node = self.graph.nodes[key]
@@ -367,6 +430,10 @@ class GeneralAgent(Agent):
     def _decide(self, key: bytes, node: Node, frame: np.ndarray) -> tuple[ActionKey, str]:
         if self.route:
             return self._walk(key, "walking to an untried action")
+        click = self._cell_click(node, frame)
+        if click is not None:
+            self._expected = None
+            return click
         untried = self.graph.untried(key)
         guided = self.progress is not None and self.progress.ready
         if guided and (not any(self.priority(t) >= 0 for t in untried) or self._better_elsewhere(key)):
@@ -396,6 +463,28 @@ class GeneralAgent(Agent):
         fallback = next(iter(node.edges), node.targets[0].action if node.targets else 1)
         return fallback, "everything here was tried"
 
+    def _cell_click(self, node: Node, frame: np.ndarray) -> tuple[ActionKey, str] | None:
+        """The cell most likely to be wrong. If all look right and the level goes on, one verdict is mistaken:
+        try the cell CellNet is least sure about, and it will put the cell back if that does not win."""
+        if self.cell_learner is None or not self.cell_learner.ready:
+            return None
+        cells = [t for t in node.targets if t.box is not None and t.kind[1] in self.cell_shapes]
+        if not cells:
+            return None
+        hidden = np.where(self._mask(), HIDDEN, frame.astype(np.int16))
+        wrong = self.cell_learner.wrong(hidden, [t.box for t in cells], {t.kind[0] for t in cells})
+        usable = [(score, t.action) for score, t in zip(wrong, cells)
+                  if t.action not in self.dead_cells and self.cell_clicks[t.action] < self.CELL_CLICKS]
+        for score, action in sorted(usable, key=lambda c: c[0], reverse=True):
+            if score > 0.5:
+                self.cell_clicks[action] += 1
+                return action, "CellNet: this object looks wrong"
+            if action not in self.doubted:
+                self.doubted.add(action)
+                self.cell_clicks[action] += 1
+                return action, "CellNet: all look right, trying the one it is least sure of"
+        return None
+
     def _better_elsewhere(self, key: bytes) -> bool:
         """Leave this state if another frontier state looks better even after walking there."""
         routes = self.graph.distances(key)
@@ -421,4 +510,5 @@ class GeneralAgent(Agent):
         found = self.gauge.gauge
         return {"level_actions": list(self.level_actions), "states": len(self.graph.nodes), "resets": self.resets,
                 "kinds": len(self.kinds.tries), "gauge": None if found is None else (found.fill, found.rect),
+                "cell levels": len(self.cell_learner.levels) if self.cell_learner else 0,
                 "why": dict(self.why_counts)}
