@@ -42,7 +42,7 @@ from .gauge import GaugeFinder
 from .ls20_specialist import LS20ExtendedStateAgent
 from .slide_net import NAMES as SLIDE_NAMES
 from .slide_net import SlideLearner
-from .model import CLICK_ID, to_array
+from .model import to_array
 from .general_agent import GeneralAgent
 
 
@@ -220,12 +220,11 @@ class CausalAgent(Agent):
             events.append(("level", f"level {level} solved in {self.level_actions[level - 1]} actions"))
         if action is not GameAction.RESET:
             self.level_actions[level] += 1
-        click = action.value == CLICK_ID
         why = f"explorer: {self.explorer.last_choice['why']}"
-        self.trace.append(dict(frame=frame, action=action.value, x=action.action_data.x if click else -1,
-                               y=action.action_data.y if click else -1, p=None, why=why, level=level,
-                               heat=np.zeros(frame.shape), heat_title="general agent (no network)", attempt=self.attempts,
-                               events=events, info={"strategy": f"general agent ({self.fallback})"}))
+        step = dict(self.explorer.trace[-1])           # what the general agent saw and believed
+        step.update(why=why, level=level, attempt=self.attempts, events=events + step.get("events", []),
+                    info={"strategy": f"general agent ({self.fallback})", **step.get("info", {})})
+        self.trace.append(step)
         self.last_choice = {"action": self.explorer.last_choice["action"], "why": why}
         return action
 

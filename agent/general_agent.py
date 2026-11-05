@@ -13,6 +13,10 @@ same situation does the same thing. Nothing here knows about keys, doors, player
   transfer   objects are grouped by appearance. What a kind of object did (react or not) is kept across
              levels, so later levels skip what never reacted. Each solved level also trains ProgressNet
              (progress_net.py), and later levels explore first where it sees a state close to a win
+  world      WorldNet (world_net.py), pretrained on generated games, says before anything is tried which keys
+             and which clicks will change something (also clicks on empty space) and how close a screen
+             looks to a win. That orders what to try and where to explore from. Its value head is
+             fine-tuned on each solved level
   cells      when a solved level was about changing the colour of same-shaped objects, it trains CellNet
              (cell_net.py), and later levels click the objects it sees as wrong before exploring
 
@@ -40,6 +44,7 @@ from .cell_net import HIDDEN, CellLearner
 from .gauge import GaugeFinder
 from .model import CLICK_ID, to_array
 from .progress_net import ProgressLearner
+from .world_net import KEYS as WORLD_KEYS, WEIGHTS as WORLD_WEIGHTS, World
 
 ActionKey = Hashable                     # an ACTION id, or (x, y) for a click
 FOUR_NEIGHBOURS = np.array([[0, 1, 0], [1, 1, 1], [0, 1, 0]])
@@ -52,6 +57,7 @@ class Target:
     kind: Hashable                       # what kind of action or object this is
     box: tuple[int, int, int, int] | None = None     # y0 x0 y1 x1, for an object
     pixels: np.ndarray | None = None     # its pixels in the frame, for an object
+    prior: float = 0.5                   # WorldNet: how likely it is to change something, before trying
 
 
 def objects(frame: np.ndarray, ignore: np.ndarray, max_area: float = 0.25) -> list[Target]:
@@ -86,11 +92,11 @@ class KindStats:
         self.tries[kind] = self.tries.get(kind, 0) + 1
         self.hits[kind] = self.hits.get(kind, 0) + int(reacted)
 
-    def priority(self, kind: Hashable) -> float:
-        """Higher first. Unknown kinds rank between what reacts and what never did."""
+    def priority(self, kind: Hashable, prior: float = 0.5) -> float:
+        """Higher first. Unknown kinds rank by the prior, between what reacts and what never did."""
         tries, hits = self.tries.get(kind, 0), self.hits.get(kind, 0)
         if tries == 0:
-            return 0.5
+            return prior
         if hits == 0 and tries >= self.GIVE_UP_AFTER:
             return -1.0
         return (hits + 0.5) / (tries + 1)
@@ -111,8 +117,9 @@ class Node:
     frame: np.ndarray                    # as the networks see it: without the ignored pixels
     edges: dict[ActionKey, tuple[bytes, int]] = field(default_factory=dict)   # action -> (next state, spent)
     fatal: set[ActionKey] = field(default_factory=set)                        # actions that ended the attempt
-    value: float = 0.0                   # ProgressNet's opinion
+    value: float = 0.0                   # ProgressNet's or WorldNet's opinion
     value_version: int = -1
+    raw: np.ndarray | None = None        # the frame as the game showed it
 
 
 class LevelGraph:
@@ -179,6 +186,9 @@ class GeneralAgent(Agent):
     SEED = 0
     PROGRESS = False         # let ProgressNet order the exploration once a level was solved (no gain so far)
     CELLS = True             # let CellNet choose clicks once a level about object colours was solved
+    WORLD = True             # let the pretrained WorldNet order actions and pick where to explore from
+    SPOTS = 4                # clicks on empty space WorldNet finds most promising, offered per state
+    SPOT_WEIGHT = 0.5        # a spot's prior is WorldNet's click score times this: objects come first
     MIN_CELLS = 4            # fewer cells than this in a solved level are not worth training on
     CELL_CLICKS = 4          # clicks on one cell before CellNet leaves it alone in this attempt
     DETOUR_COST = 0.02       # value a state must offer per extra action of walking to it
@@ -193,6 +203,8 @@ class GeneralAgent(Agent):
         self.places = KindStats()                # by place on screen, this level only
         self.why_counts: Counter = Counter()
         self.progress = ProgressLearner() if self.PROGRESS else None
+        self.world = World() if self.WORLD and WORLD_WEIGHTS.exists() else None
+        self._world_cache: dict[bytes, dict[str, np.ndarray]] = {}   # WorldNet's outputs by screen
         self.cell_learner = CellLearner(self.SEED) if self.CELLS else None
         self.cell_shapes: set[Hashable] = set()  # shapes CellNet was trained on
         self.cell_clicks: Counter = Counter()    # this attempt: clicks CellNet asked for, by place
@@ -211,7 +223,9 @@ class GeneralAgent(Agent):
         self.level_actions = [0]
         self.resets = 0
         self.last_choice: dict[str, Any] = {}
-        self.trace: list[dict] = []
+        self.trace: list[dict] = []              # one entry per step, for the replay (replay.py)
+        self._events: list[tuple[str, str]] = []
+        self._cell_scores: tuple[list[Target], np.ndarray] | None = None
 
     # ----------------------------------------------------------------- contract
     def is_done(self, frames: list[FrameData], latest_frame: FrameData) -> bool:
@@ -222,14 +236,18 @@ class GeneralAgent(Agent):
         if latest_frame.state in (GameState.NOT_PLAYED, GameState.GAME_OVER):
             self._close_step(frame, died=True)
             self.resets += latest_frame.state is GameState.GAME_OVER
+            if latest_frame.state is GameState.GAME_OVER:
+                self._events.append(("death", f"game over: restarting level {self.level + 1}"))
             self.route = []
             self.restarting = True
             self.cell_clicks.clear()
             self.last_choice = {"action": "RESET", "why": "start of game or game over"}
+            self._record(frame, GameAction.RESET, latest_frame.levels_completed)
             return GameAction.RESET
 
         level = latest_frame.levels_completed
         if level > self.level:
+            self._events.append(("level", f"level {self.level + 1} solved in {self.level_actions[self.level]} actions"))
             self._close_step(frame, solved=True)
             self._new_level(level)
         else:
@@ -250,7 +268,9 @@ class GeneralAgent(Agent):
         self.level_actions[self.level] += 1
         self.last_choice = {"action": str(action), "why": why}
         self.why_counts[why] += 1
-        return self._game_action(action)
+        game_action = self._game_action(action)
+        self._record(frame, game_action, level)
+        return game_action
 
     def take_over(self, level: int, midway: bool) -> None:
         """Start playing a game someone else began. A frame from inside a level must not count as its start."""
@@ -286,8 +306,40 @@ class GeneralAgent(Agent):
             if CLICK_ID in available:
                 targets += objects(frame, self._mask())
             self.rng.shuffle(targets)          # ties are broken by order, so runs differ only by seed
-            node = self.graph.nodes[key] = Node(targets, self._seen_frame(frame))
+            node = self.graph.nodes[key] = Node(self._with_priors(targets, frame, available), self._seen_frame(frame),
+                                                raw=frame)
         return node
+
+    def _world_view(self, frame: np.ndarray) -> dict[str, np.ndarray]:
+        """WorldNet's outputs for a screen, computed once per screen and value head version."""
+        key = hashlib.blake2b(frame.tobytes() + bytes([self.world.version % 256]), digest_size=12).digest()
+        if key not in self._world_cache:
+            if len(self._world_cache) > 4000:
+                self._world_cache.clear()
+            self._world_cache[key] = {k: v[0] for k, v in self.world.predict(frame[None]).items()}
+        return self._world_cache[key]
+
+    def _with_priors(self, targets: list[Target], frame: np.ndarray, available: list[int]) -> list[Target]:
+        """What WorldNet expects of each action here, and the empty spots it thinks are worth a click."""
+        if self.world is None:
+            return targets
+        out = self._world_view(frame)
+        for t in targets:
+            if t.box is None and t.action in WORLD_KEYS:
+                t.prior = float(out["keys"][WORLD_KEYS.index(t.action)])
+            elif t.pixels is not None:
+                t.prior = float(out["clicks"][t.pixels].max())
+        if CLICK_ID in available and self.SPOTS:
+            taken = np.logical_or.reduce([t.pixels for t in targets if t.pixels is not None] + [self._mask()])
+            heat = np.where(taken, 0, out["clicks"])
+            for _ in range(self.SPOTS):
+                y, x = np.unravel_index(int(heat.argmax()), heat.shape)
+                if heat[y, x] < 0.5:
+                    break
+                targets.append(Target((int(x), int(y)), ("spot", int(x), int(y)),
+                                      prior=self.SPOT_WEIGHT * float(heat[y, x])))
+                heat[max(0, y - 2):y + 3, max(0, x - 2):x + 3] = 0
+        return targets
 
     def _rebuild(self) -> None:
         """The definition of a state changed: replay this level's steps into a new graph."""
@@ -296,9 +348,11 @@ class GeneralAgent(Agent):
         for step in self.history:
             key, target = self.state(step.before), self.state(step.after)
             if key not in self.graph.nodes:
-                self.graph.nodes[key] = Node(self._targets_like(old, step.before), self._seen_frame(step.before))
+                self.graph.nodes[key] = Node(self._targets_like(old, step.before), self._seen_frame(step.before),
+                                             raw=step.before)
             if target not in self.graph.nodes:
-                self.graph.nodes[target] = Node(self._targets_like(old, step.after), self._seen_frame(step.after))
+                self.graph.nodes[target] = Node(self._targets_like(old, step.after), self._seen_frame(step.after),
+                                                raw=step.after)
             self.graph.nodes[key].edges[step.action] = (target, step.spent)
         if self.level_start is not None:
             self.graph.start = self.state(self.level_start)
@@ -307,7 +361,8 @@ class GeneralAgent(Agent):
         first = next(iter(old.nodes.values()), None)
         simple = [t for t in first.targets if not isinstance(t.action, tuple)] if first else []
         clicks = any(isinstance(t.action, tuple) for n in old.nodes.values() for t in n.targets)
-        return simple + (objects(frame, self._mask()) if clicks else [])
+        available = [t.action for t in simple] + ([CLICK_ID] if clicks else [])
+        return self._with_priors(simple + (objects(frame, self._mask()) if clicks else []), frame, available)
 
     def _new_level(self, level: int) -> None:
         while len(self.level_actions) <= level:
@@ -359,6 +414,10 @@ class GeneralAgent(Agent):
 
     def _learn_from_win(self, last: bytes) -> None:
         """The graph of a solved level says how far from the win every state was."""
+        if self.world is not None:
+            distance = self.graph.distance_to(last)
+            self.world.add_level([(n.raw, 0.0 if k not in distance else 0.9 ** (distance[k] + 1))
+                                  for k, n in self.graph.nodes.items() if n.raw is not None])
         if self.progress is None:
             return
         distance = self.graph.distance_to(last)
@@ -382,6 +441,8 @@ class GeneralAgent(Agent):
         self.cell_learner.add_level(hidden, [(t.pixels, t.box) for t in cells], colours)
         self.cell_learner.train()
         self.cell_shapes |= shapes
+        self._events.append(("cellnet", f"CellNet trained on {len(cells)} objects of this level "
+                                    f"(loss {self.cell_learner.last_loss:.3f})"))
 
     def _after_click(self, last: np.ndarray, action: ActionKey, mask: np.ndarray) -> np.ndarray:
         """The frame a winning click produced is never shown: the next level comes instead."""
@@ -407,6 +468,11 @@ class GeneralAgent(Agent):
 
     def _value(self, key: bytes) -> float:
         node = self.graph.nodes[key]
+        if self.world is not None:
+            if node.value_version != self.world.version:
+                node.value = float(self._world_view(node.raw)["value"]) if node.raw is not None else 0.0
+                node.value_version = self.world.version
+            return node.value
         if node.value_version != self.progress.version:
             node.value = float(self.progress.score([node.frame])[0])
             node.value_version = self.progress.version
@@ -425,7 +491,7 @@ class GeneralAgent(Agent):
     # ----------------------------------------------------------------- deciding
     def priority(self, t: Target) -> float:
         """Higher first. Negative: it never reacted, as this kind of object or at this place."""
-        return min(self.kinds.priority(t.kind), self.places.priority(t.action))
+        return min(self.kinds.priority(t.kind, t.prior), self.places.priority(t.action, t.prior))
 
     def _decide(self, key: bytes, node: Node, frame: np.ndarray) -> tuple[ActionKey, str]:
         if self.route:
@@ -435,7 +501,7 @@ class GeneralAgent(Agent):
             self._expected = None
             return click
         untried = self.graph.untried(key)
-        guided = self.progress is not None and self.progress.ready
+        guided = self.world is not None or (self.progress is not None and self.progress.ready)
         if guided and (not any(self.priority(t) >= 0 for t in untried) or self._better_elsewhere(key)):
             route = self._best_frontier(key, frame)
             if route:
@@ -473,6 +539,7 @@ class GeneralAgent(Agent):
             return None
         hidden = np.where(self._mask(), HIDDEN, frame.astype(np.int16))
         wrong = self.cell_learner.wrong(hidden, [t.box for t in cells], {t.kind[0] for t in cells})
+        self._cell_scores = (cells, wrong)
         usable = [(score, t.action) for score, t in zip(wrong, cells)
                   if t.action not in self.dead_cells and self.cell_clicks[t.action] < self.CELL_CLICKS]
         for score, action in sorted(usable, key=lambda c: c[0], reverse=True):
@@ -481,6 +548,7 @@ class GeneralAgent(Agent):
                 return action, "CellNet: this object looks wrong"
             if action not in self.doubted:
                 self.doubted.add(action)
+                self._events.append(("doubt", "all objects look right but the level goes on: doubting one"))
                 self.cell_clicks[action] += 1
                 return action, "CellNet: all look right, trying the one it is least sure of"
         return None
@@ -504,6 +572,40 @@ class GeneralAgent(Agent):
             game_action.set_data({"x": action[0], "y": action[1]})
             return game_action
         return GameAction.from_id(action)
+
+    # ------------------------------------------------------------------ replays
+    def _record(self, frame: np.ndarray, action: GameAction, level: int) -> None:
+        """One replay step: what the agent saw and believed (read by run_local's GIF and HTML replays)."""
+        maps = []
+        if self._cell_scores is not None:
+            heat = np.zeros(frame.shape, np.float16)
+            for t, score in zip(*self._cell_scores):
+                heat[t.pixels] = score
+            maps.append(("CellNet: P(this object is wrong)", heat))
+        tried = np.zeros(frame.shape, np.float16)
+        node = self.graph.nodes.get(self.state(frame))
+        for t in node.targets if node is not None else []:
+            if t.pixels is not None and t.action in self.places.tries:
+                tried[t.pixels] = 0.3 + 0.7 * min(1.0, self.places.hits.get(t.action, 0) / self.places.tries[t.action])
+        maps.append(("objects tried this level (brighter: reacted more often)", tried))
+        if self.world is not None and node is not None and node.raw is not None:
+            out = self._world_view(node.raw)
+            maps.append(("WorldNet: where a click changes something", out["clicks"].astype(np.float16)))
+            maps.append(("WorldNet: P(goal)", out["roles"][3].astype(np.float16)))
+            maps.append(("WorldNet: P(what I control)", out["roles"][2].astype(np.float16)))
+        click = action.value == CLICK_ID
+        energy = self.gauge.read(frame)
+        self.trace.append(dict(
+            frame=frame, action=action.value, x=action.action_data.x if click else -1,
+            y=action.action_data.y if click else -1, p=None, why=self.last_choice.get("why", ""), level=level,
+            attempt=self.resets + 1, events=self._events, maps=maps, heat=maps[0][1], heat_title=maps[0][0],
+            stats={**({} if energy is None else {"resource": energy}),
+                   **({} if self.world is None or node is None else {"world_value": self._value(self.state(frame))})},
+            info={"strategy": "general agent", "states in this level's map": len(self.graph.nodes),
+                  "CellNet": f"trained on {len(self.cell_learner.levels)} levels" if self.cell_learner
+                  and self.cell_learner.ready else "not trained yet",
+                  "objects that look wrong": None if self._cell_scores is None else int((self._cell_scores[1] > 0.5).sum())}))
+        self._events, self._cell_scores = [], None
 
     # ---------------------------------------------------------------- reporting
     def stats(self) -> dict[str, Any]:

@@ -17,9 +17,14 @@ ARC-AGI-3/
 │   ├── gauge.py         discovers a resource bar from how it drains, with no place or colour given
 │   ├── general_agent.py plays any game with no game-specific knowledge: exploration graph of states
 │   ├── cell_net.py      CNN that learns from a solved level which objects are in the wrong state
+│   ├── world_net.py     CNN pretrained on generated games: keys, clicks, roles, closeness to a win
+│   ├── weights/         world_net.pt, the pretrained WorldNet (0.5 MB)
 │   ├── progress_net.py  experimental CNN: how close a state is to a win (off, no gain so far)
 │   ├── base.py          minimal Agent base class, so the agent runs without the official framework
 │   └── __init__.py      marks agent/ as a Python package
+├── pretrain/
+│   ├── library.py       generator of small games drawn like ARC-AGI-3 frames, with their true answers
+│   └── train_world.py   pretrains WorldNet on them: python3 -m pretrain.train_world --steps 6000
 ├── tests/               regression tests (python3 tests/test_ls20_regression.py)
 ├── arc-special-tile-agent/  teammate's original causal agent, kept as delivered
 ├── run_local.py         plays games locally, prints what the agent learns, saves replay GIFs
@@ -288,6 +293,48 @@ levels), and carrying the shapes on a solution over to the next level. ProgressN
 `PROGRESS = True`) is a CNN trained after each solved level on the distance to the win read from the graph, meant
 to order exploration on later levels. It solved no level 2 in 3000 actions, so it is off.
 
+### WorldNet: pretraining on a library of generated games (`agent/world_net.py`, `pretrain/`)
+
+People come to a new game knowing what games usually look like. WorldNet gives the agent some of that before
+it starts. One CNN is pretrained on generated games, and it follows the order a person would think in:
+
+| Step | Head | Learned from generated games | How the agent uses it |
+|---|---|---|---|
+| 1. What do the controls do? | keys | which keys change the game here | tries the keys it expects to work first |
+| 2. Where can I act? | clicks | where a click changes the game, per pixel | tries likely objects first, and offers the 4 best spots on empty space |
+| 3. What is in the game? | roles | background, wall, what I control, goal, item, clickable, hint, gauge | shown in the replay |
+| 4. How close am I? | value | 0.9 to the power of the actions still needed | explores from the screen that looks closest to a win, fine-tuned on each solved level |
+
+The library (`pretrain/library.py`) generates games in the real format, with random palettes, sizes and energy
+bars: mazes (with key colours, pushers and refills, like ls20), box pushing (new), tile toggling with four kinds
+of rule (hint tiles like ft09, a copy, a mirror, "lights out"), and select-and-move by clicking empty space (new).
+It was written from the development games only. The trunk keeps 64 x 64 and uses dilated convolutions; 121,000
+parameters, trained 6000 steps of 32 states, about 1.8 hours on this laptop's CPU (the challenge allows about 9).
+On new generated games: roles 93% right, clicks found 92% (77% of predicted clicks right), keys 87% right.
+
+Same code for every game. 2000 actions, 3 seeds, levels solved and actions on level 1:
+
+| Game | Set | Without WorldNet | With WorldNet |
+|---|---|---|---|
+| ls20 | development | 1, 1, 1 (327, 467, 283) | 1, 1, 1 (163, 163, 163) |
+| r11l | development | 1, 1, 1 (26, 12, 38) | 1, 1, 1 (16, 16, 28) |
+| ft09 | development | 3, 3, 3 (414, 598, 892) | 3, 4, 3 (668, 842, 544) |
+| bp35 | development | 0, 1, 0 (880) | 1, 1, 1 (123, 55, 929) |
+| su15 | held out | 1, 1, 1 (549, 576, 357) | 1, 1, 1 (320, 429, 187) |
+| m0r0 | held out | 0, 1, 0 (35) | 0, 1, 1 (1119, 1407) |
+| sb26 | held out | 0, 0, 0 | 0, 0, 0 |
+| total levels | | 20 | 24 |
+
+So pretraining helps: 24 levels against 20, bp35 is solved on every seed, ls20 and su15 need about half the
+actions, and one ft09 run reached level 4 for the first time. On the held-out games it is 5 levels against 4, a
+small sample. m0r0 is solved more often but more slowly, and sb26 is still not solved.
+
+What we tuned, on development games only: the first try offered 4 empty-space clicks at full weight, and r11l
+went from 12-38 actions to 196-261, because WorldNet thinks almost any pixel of r11l is clickable. Halving the
+weight of those spots fixed it (16-28) and kept the gains elsewhere. Seen on real frames, WorldNet finds the
+ft09 tiles and the energy bars, but it often mislabels players and walls, so the generated games are still
+far from the real ones. Longer training will not fix that gap; more varied games in the library might.
+
 ### CellNet: learning what a level asks for (`agent/cell_net.py`)
 
 The first step past level 1 is `ft09`. A solved level shows many objects of one shape the way the level wants them,
@@ -317,7 +364,8 @@ search. These first attempts did not work: a CNN on the whole frame did not lear
 worse on new layouts (6 of 18 wrong on level 4 at 3000 steps), and a net that votes place by place did not learn.
 
 The next step is more of this on other games: clicking at computed places (`r11l`) and using objects to reconnect the
-planner (`bp35`, `m0r0`). The replay viewer does not support `--agent general`; run the same play through `causal-slides` to see it.
+planner (`bp35`, `m0r0`). `--html` and `--gif` work with `--agent general` too: the replay shows CellNet's opinion of every object and
+which objects were tried.
 
 ### Other games: held-out test and fallback
 
@@ -491,6 +539,9 @@ Comparison on the same 6 games and budget (one run each, so a difference of one 
 ### 2026-10-30 - GaugeFinder: the energy bar is discovered, not hard-coded
 - New `agent/gauge.py` and `run_local.py --agent causal-gauge`. Finds a resource bar from how it drains, reads it,
   and learns from a restart that an empty gauge costs a life. ls20 result unchanged: WIN in 443 actions.
+
+### 2026-11-04 - WorldNet: pretraining on generated games
+- `pretrain/library.py` generates four families of small games with their true answers; `pretrain/train_world.py` pretrains `agent/world_net.py` on them (weights in `agent/weights/world_net.pt`). `GeneralAgent` uses it to order keys and clicks, to offer clicks on empty space and to choose where to explore from, and fine-tunes its value head on each solved level. Over 7 games and 3 seeds: 24 levels against 20 without it.
 
 ### 2026-10-31 - CellNet: `ft09` solves levels 2 and 3
 - `GeneralAgent` trains `agent/cell_net.py` on a solved level about recolouring objects, then clicks what it sees as wrong. `ft09` goes from 1 level to 3 on all 3 seeds, with level 2 in 7 actions (human baseline 12). The other six games are unchanged: CellNet does not train there.

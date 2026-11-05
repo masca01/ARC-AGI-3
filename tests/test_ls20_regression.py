@@ -185,7 +185,7 @@ def test_gauge_learns_what_empty_means_from_a_restart():
     assert finder.observe_restart(0) and finder.fatal_when_empty is True
 
 
-def play_general(game: str, max_actions: int):
+def play_general(game: str, max_actions: int, **settings):
     import arc_agi
     from dotenv import load_dotenv
 
@@ -193,7 +193,7 @@ def play_general(game: str, max_actions: int):
     load_dotenv(ROOT / ".env")
     logging.disable(logging.CRITICAL)
     env = arc_agi.Arcade().make(game, include_frame_data=True)
-    agent_cls = type("TestAgent", (GeneralAgent,), {"MAX_ACTIONS": max_actions})
+    agent_cls = type("TestAgent", (GeneralAgent,), {"MAX_ACTIONS": max_actions, **settings})
     agent = agent_cls(card_id="local", game_id=game, agent_name="test", ROOT_URL="http://localhost",
                       record=False, arc_env=env)
     agent.main()
@@ -238,9 +238,79 @@ def test_general_agent_routes_must_be_affordable():
 
 def test_cell_net_solves_a_second_level_from_the_rule_of_the_first():
     """ft09: nothing can search level 2. CellNet learns the rule on level 1 and needs one click per wrong tile."""
-    agent = play_general("ft09", 450)
+    agent = play_general("ft09", 450, WORLD=False)     # CellNet alone: WorldNet's level 1 is slower here
     assert agent.frames[-1].levels_completed >= 2
     assert agent.level_actions[1] <= 12            # the human baseline for this level
+
+
+def test_general_agent_writes_an_html_replay():
+    import tempfile
+    from replay import save_html
+
+    agent = play_general("r11l", 40)
+    assert len(agent.trace) == agent.action_counter
+    assert any(t["x"] >= 0 for t in agent.trace) and all(t["maps"] for t in agent.trace)
+    with tempfile.TemporaryDirectory() as folder:
+        path = save_html(agent, "r11l", Path(folder) / "replay.html")
+        assert path.stat().st_size > 10_000
+
+
+def test_library_games_know_their_distance_to_a_win():
+    """Every family's labels agree with the game: a move that the solver says helps brings the win closer."""
+    import random
+    from pretrain.library import FAMILIES, Maze, enumerate_states, samples
+
+    rng = random.Random(0)
+    for _ in range(20):
+        for s in samples(rng, per_game=2):
+            assert s["frame"].shape == (64, 64) and s["roles"].shape == (64, 64)
+            assert 0 <= s["value"] <= 1 and set(np.unique(s["roles"])) <= set(range(8))
+    for seed in range(50):
+        states, dist, complete = enumerate_states(Maze(random.Random(seed)))
+        if any(d > 0 for d in dist.values()):
+            break
+    k = next(k for k in dist if dist[k] > 0)
+    g = states[k]
+    best = min(dist.get(_after(g, a), 99) for a in (1, 2, 3, 4))
+    assert best == dist[k] - 1
+    assert set(FAMILIES) == {"maze", "push", "toggle", "move"}
+
+
+def _after(game, action):
+    h = game.copy()
+    h.step(action)
+    return h.key()
+
+
+def test_pretraining_turns_the_arrow_keys_with_the_picture():
+    """Rotated a quarter turn anticlockwise, a game where only UP moves becomes one where only LEFT moves."""
+    from pretrain.train_world import augment
+
+    class Fixed:
+        def randrange(self, n): return 1
+        def random(self): return 0.9
+
+    keys = np.array([1, 0, 0, 0, 0, 0], np.float32)              # ACTION1 (up) changes the game
+    s = dict(frame=np.zeros((64, 64), np.uint8), roles=np.zeros((64, 64), np.uint8),
+             clicks=np.zeros((64, 64), bool), keys=keys, available=np.ones(6, np.float32))
+    turned = augment([s], Fixed())[0]
+    assert turned["keys"].tolist() == [0, 0, 1, 0, 0, 0]          # ACTION3 (left)
+
+
+def test_pretrained_world_net_guides_the_general_agent():
+    """With the pretrained weights the agent orders its actions by WorldNet and still solves r11l's first level."""
+    import arc_agi
+    from dotenv import load_dotenv
+
+    load_dotenv(ROOT / ".env")
+    logging.disable(logging.CRITICAL)
+    env = arc_agi.Arcade().make("r11l", include_frame_data=True)
+    agent_cls = type("TestAgent", (GeneralAgent,), {"MAX_ACTIONS": 80})
+    agent = agent_cls(card_id="local", game_id="r11l", agent_name="test", ROOT_URL="http://localhost",
+                      record=False, arc_env=env)
+    agent.main()
+    assert agent.world is not None and agent.frames[-1].levels_completed >= 1
+    assert any(t.prior != 0.5 for n in agent.graph.nodes.values() for t in n.targets)
 
 
 def test_cell_view_describes_pixels_relative_to_the_cell():

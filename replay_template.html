@@ -158,7 +158,8 @@ const DATA = /*__DATA__*/null;
 const EV = { level: ["--level", "level solved"], death: ["--death", "game over"], learn: ["--learn", "tile rule learned"],
              edge: ["--edge", "non-local move learned"], slide: ["--slide", "push predicted"],
              surprise: ["--surprise", "surprise push (fast learning)"], goal: ["--goal", "objective update"], fallback: ["--death", "switched to general explorer"], memory: ["--memory", "memory update"],
-             miss: ["--miss", "CNN miss"], cnn: ["--cnn", "CNN milestone"] };
+             miss: ["--miss", "CNN miss"], cnn: ["--cnn", "CNN milestone"], cellnet: ["--cnn", "CellNet trained"],
+             doubt: ["--surprise", "CellNet doubted"] };
 const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 const $ = id => document.getElementById(id);
 const S = 8;   // game canvas pixels per frame pixel
@@ -380,7 +381,7 @@ function drawTimeline() {
   ctx.font = `${11 * dpr}px system-ui`; ctx.fillStyle = "#333";
   let last = -1; DATA.meta.forEach((m, i) => { if (m.level !== last) { last = m.level; ctx.fillText(`L${m.level + 1}`, i * bw + 3 * dpr, 13 * dpr); } });
 }
-const SERIES = [["cnn_conf", "CNN confidence (player window)", "#35b5e0", [0, 1]], ["resource", "resource", "#e0b12f", null],
+const SERIES = [["cnn_conf", "CNN confidence (player window)", "#35b5e0", [0, 1]], ["world_value", "WorldNet: how close to a win", "#7a5cff", [0, 1]], ["resource", "resource", "#e0b12f", null],
                 ["loss", "CNN training loss", "#d64545", null], ["P(change)", "P(change) of chosen move", "#2f6fde", [0, 1]]];
 function drawSpark() {
   const c = $("spark"), dpr = window.devicePixelRatio || 1;

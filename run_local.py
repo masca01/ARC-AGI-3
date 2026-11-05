@@ -141,6 +141,9 @@ def save_replay(r: dict, agent_name: str) -> None:
             summary["grid"] = [p.step, *p.origin]
         elif scene is not None:
             summary["grid"] = [5, *scene.origin]
+    elif isinstance(agent, GeneralAgent):
+        summary.update({"actions per level": r["level_actions"], "game overs": r["resets"],
+                        "CellNet trained on": f"{r['cell levels']} levels"})
     elif r.get("level_steps"):
         summary["level solved at step"] = r["level_steps"]
     path = save_html(agent, r["game"], OUT / f"{r['game']}_{agent_name}_replay.html", summary)
@@ -178,9 +181,7 @@ def main() -> None:
             results.append(r)
             if args.gif:
                 save_gif(r["agent"], g)
-            if args.html and args.agent == "general":
-                print("  the general agent records no replay yet")
-            elif args.html:
+            if args.html:
                 save_replay(r, args.agent)
 
     if args.agent == "general":
